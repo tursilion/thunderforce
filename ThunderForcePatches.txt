@@ -1,0 +1,14 @@
+These patches are meant for BIN files.
+
+Thunder Force II
+- Configuration screen modified to allow lives to be set from 1-99
+
+Thunder Force III
+- Replaced Voice Test in configuration screen with lives select from 1-99
+- Added ability to mute weapon sounds in-game (pause, then press fire to toggle)
+
+Thunder Force IV
+- Modified configuration menu to always display the Omake music
+- Modified configuration menu to allow lives to be set from 1-99
+- Made region-free
+

@@ -1,0 +1,53 @@
+<!DOCTYPE HTML>
+<html><body>
+
+<H1 class="ipsType_pagetitle">Hit a Snag!</H1>
+<DIV class="desc">														Posted by <STRONG><A title="View Profile" class="_hovertrigger url fn name " 
+href="http://atariage.com/forums/user/12959-tursi/" data-ipb="noparse" 
+hovercard-id="12959" hovercard-ref="member"><SPAN 
+itemprop="name">Tursi</SPAN></A></STRONG>, 																													20 
+December 2014							 · 							76 views						 </DIV><BR class="clear"></DIV>
+<DIV class="entry_content ipsType_textblock ipsPad">																			I ran 
+into a small problem last night when I went to build the actual cartridge. It 
+turns out the EPROMs I have are 2MB, not 4MB like I was thinking and planning 
+on. A quick search suggested that was in fact the norm across the board!<BR><BR>
+But I looked on and noticed that there were 3MB and 4MB cartridges - the only 
+one of these I own is Lion King (3MB), so I popped it open to have a look. And 
+sure enough, it has TWO ROMs, not one. A simply selection circuit made up of a 
+74LS00 Quad NAND gate was also present. I traced through this circuit, and it 
+used !CE and A21 to activate the CE of the appropriate ROM, using the Quad NAND 
+interestingly as two inverters and two NAND gates. Very clever!<BR><BR>So now I 
+had to figure out what to do with my multicart. I didn't /really/ want the more 
+complex circuit, and I wasn't sure I needed it. I also didn't want to sacrifice 
+my Lion King cart.<BR><BR>But, there's only actually 2MB of game in my multicart 
+- two 512k, and one 1MB, so if I could find enough space to squeeze in my menu, 
+I could just use that. Suddenly my 43k menu felt really big, but first I needed 
+to see HOW big it was by enumerating the blank spots.<BR><BR>After scanning a 
+couple by hand, I wrote a little tool to look for blocks of 00 or FF bytes 
+longer than 16 bytes long, report and total them. The results were not good. TF2 
+only has two blocks bigger than 1k, and a total of 9k free. TF3 has only 1.6k 
+free. TF4 does "better", with a total of 19k free, but only four blocks over 1k. 
+In other words, not a chance.<BR><BR>I could of course go for a dumb menu - 
+plain text would squeeze into those spots, but no. Damnit, I want my fancy menu. 
+So I'm back to square 1.<BR><BR>So this means two EPROMs, and I still haven't 
+proven that my banking concept works. It would be nice to find a Genesis 
+emulator that does NOT use Starscream for a change...<BR><BR>All that said, the 
+banking circuit doesn't get much more complicated. I still tie in two lines to 
+the address bus, and just use two flipflops. The difference now is that only one 
+of the lines triggers bank select (selecting which 1MB half of a chip to use), 
+while the other needs to trigger which EPROM to use.<BR><BR>The Sega cart tied 
+this chip select in with the !CE line from the Genesis, but I don't really need 
+to do that. These chips all also have a second select line called !G, which is 
+normally tied to ground in a Genesis cart. By letting my circuit activate that 
+line, and the Genesis trigger !CE, I should be able to get away with the bank 
+selection without much more effort.<BR><BR>(Per the datasheet, !CE is the power 
+control line, and !G is the output enable. So both chips will be powered up on 
+Genesis select, but only one will output data. This should still be 
+fine.)<BR><BR>For mounting the two EPROMs in a single ROM donor cart, well, I've 
+done this before! It's possible to mount one of the ROMs /under/ the PCB, 
+sharing the pins. I did this with my original Thunder Force 3 cart hack.<BR><BR>
+My only real concern is that this is a lot of soldering to do before I even know 
+if it works. If it doesn't, I'm going to be grumpy and it will be hard to 
+troubleshoot. Probably best to start with just the one chip containing the menu 
+and TF2. 
+</BODY></HTML>

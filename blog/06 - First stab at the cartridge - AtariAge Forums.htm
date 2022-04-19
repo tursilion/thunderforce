@@ -1,0 +1,36 @@
+<!DOCTYPE HTML>
+<html><body>
+<H1 class="ipsType_pagetitle">First stab at the cartridge</H1>
+<DIV class="desc">														Posted by <STRONG><A title="View Profile" class="_hovertrigger url fn name " 
+href="http://atariage.com/forums/user/12959-tursi/" data-ipb="noparse" 
+hovercard-id="12959" hovercard-ref="member"><SPAN 
+itemprop="name">Tursi</SPAN></A></STRONG>, 																													21 
+December 2014							 · 							77 views						 </DIV><BR class="clear"></DIV>
+<DIV class="entry_content ipsType_textblock ipsPad">																			I'll post 
+a more detailed blog when it's working I guess...<BR><BR>After fiddling with so 
+many options, I decided to go ahead with my original plan, just this time with 
+two ROMs to get the 4MB.<BR><BR>For my first test, I burned the first 2MB to 
+contain the menu and Thunder Force 2, and plugged it into the Genesis raw. To my 
+surprise, TF2 came up instead of the menu. I theorized that the donor cart was 
+only 512k, and it tied A19 high... this turned out to be the case. Tying the 
+ROM's A19 to the Genesis A20 (which is the correct mapping because of the word 
+instead of byte size), made it come up with the menu.<BR><BR>I then found my 
+first issue -- I forgot to debounce the inputs. As a result, pressing up or down 
+is as likely to jump two steps as one. That kind of sucks, but, the ROM is 
+already burned and soldered, so heck with it, I thought.<BR><BR>Next, I added 
+the flipflop. I used a 74LS174, which is a hex flip flop containing only a set 
+and non-inverted output. There is a single clock and single clear. The idea 
+being that two bits can be captured to use as address bits.<BR><BR>This was I 
+realized my second problem. With two ROM chips, I need an inverted select in 
+order to differentiate between the two chips. I could fake it with an extra line 
+on the flipflop and a change to the menu, but as I said, that's already said and 
+done.<BR><BR>I'm going to attempt to proceed as is, I should be to add an 
+inverter to one of the lines to act as chip select. Worst comes to worst, I can 
+fix the menu debounce. ;)<BR><BR>
+Anyway, so I added the flipflop, and set it up for just the single chip for now. 
+Unfortunately, it doesn't work, and that's why this entry has no real tech 
+details either. The menu comes up, suggesting the flipflop is resetting 
+correctly, but it never selects TF2, which it should, suggesting that the 
+Flipflop isn't latching. I will put the logic analyzer on it tomorrow and try to 
+see why not. 
+</BODY></HTML>

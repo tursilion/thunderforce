@@ -1,0 +1,85 @@
+<!DOCTYPE HTML>
+<html><body>
+<H1 class="ipsType_pagetitle">The Proof is in the Emulation</H1>
+<DIV class="desc">														Posted by <STRONG><A title="View Profile" class="_hovertrigger url fn name " 
+href="http://atariage.com/forums/user/12959-tursi/" data-ipb="noparse" 
+hovercard-id="12959" hovercard-ref="member"><SPAN 
+itemprop="name">Tursi</SPAN></A></STRONG>, 																													17 
+December 2014							 · 							88 views						 </DIV><BR class="clear"></DIV>
+<DIV class="entry_content ipsType_textblock ipsPad">																			.. or 
+maybe not proof, as every Genesis emulator has either no debugger, a very poor 
+debugger, or a very buggy debugger. Regen and Exodus seem to be the closest, but 
+Regen's breakpoint triggers are all over the place, and the entire emulator 
+crashes if you breakpoint on code in RAM. Exodus's breakpoint selection (and in 
+general, it's UI) isn't quite as nice as Regen and has fewer options, it's also 
+much slower. And neither is Open Source. Gens is open source, and after fiddling 
+around with it for a bit I found Gens-KMod was too, which was a little nicer. GK 
+has a very poor debugger, though, and while it claims GDB support, I couldn't 
+get it to work. I was able to insert my paging changes, but the overall ROM 
+didn't work and the debugger, which doesn't allow stepping, wasn't sufficient 
+for me to see whether the emulation code changes were working.<BR><BR>Even more 
+fun, I couldn't use the Visual Studio debugger to any great effect because the 
+build process for the StarScream 68k core didn't leave debug information 
+available to it. Ultimately I was at least able to prove my code was being hit 
+at the right time by inserting INT 3s into the code to force breakpoints - but I 
+wasn't able to tell if the net result was what I expected.<BR><BR>I did find a 
+bug in the paging concept, in that it would page one entry too low (so, TF2 just 
+re-paged the menu, TF3 paged TF2, and TF4 paged TF3). I also noted that the IO 
+registers are expected to be accessed 8-bits at a time on odd addresses. That 
+still works with my original scheme, so I updated it to do that. Finally, the 
+breakpoints at least let me prove that the games themselves don't access those 
+I/O registers (although I should still try to prove the whole IO space is 
+safe).<BR><BR>The updated RAM code looks like this:<BR><BR>
+<PRE class="prettyprint lang-auto linenums:0">; the following code runs from RAM, d2.w has the program number	
+@1:	
+	lsl.w #2,d2	    ; multiply by four for offset
+	moveq #0,d1	    ; prepare to zero
+	move.w d2,d1	    ; now we know its safe
+	add.l #$a13005,d1   ; add the address of the IO space, odd! First ROM is second bank (0=menu)
+	movea.l d1,a0	    ; this is the address we will poke
+	move.b d1,(a0)	    ; do the poke (value irrelevant, byte by tradition)
+	moveq #$0,d0        ; cart should be active, so prepare to jump
+	movea.l d0,a0       ; read from reset vector
+	movea.l (a0)+,sp    ; set stack pointer
+	movea.l (a0)+,a0    ; get boot address
+	jmp (a0)            ; and go do it</PRE>Stepping 
+sideways a bit, I remembered that Thunder Force 4 has a single simple hack I'd 
+always wanted. When you beat the game, it opens up another 15 music tracks on 
+the configuration screen - 10 Omake tunes as well as the ending musics. I 
+decided to make them always unlocked.<BR><BR>I started by taking RAM dumps from 
+the emulator - once when the game was just reset and taken to the options 
+screen, and once after beating the game and then going to the options screen. A 
+third RAM dump I took right after starting the game. So now I simply had to look 
+for bytes that WERE changed between the first two dumps, that were NOT changed 
+when the game was started.<BR><BR>There was only 20-30 candidate bytes, which is 
+not bad for 64k. Back in the emulator, sitting on the config screen, one-by-one 
+I changed the suspect bytes in RAM and tried the menu (on the assumption that it 
+would check every time you tried rather than only once). Luckily, this was the 
+case, and I found that setting $F079 to 1 unlocked the music.<BR><BR>Since I 
+changed about a dozen bytes before that, I reset the emulator and tried just 
+that one location to confirm it, and indeed it worked fine.<BR><BR>Knowing from 
+my TF3 work that the startup code wipes RAM a couple of times, I put it after 
+the checksum routine, but that was still too early. Since there was no harm if 
+this code ran more than once, I randomly breakpointed on the Sega logo and found 
+a nice BSR at $7CC to patch.<BR><BR>Finding a place to store it was harder. The 
+first large block of likely-unused $FF bytes was almost halfway through the ROM 
+- far too far along for a short branch. As it's late, I decided to cheat and 
+just throw the code on top of the exception vector table. Any 68k exception 
+simply ends up spinning anyway, so I figured it doesn't really matter if it 
+crashes or resets instead in that unlikely case. So here's my code:<BR><BR>
+<PRE class="prettyprint lang-auto linenums:0">000007CC                            73          org $7cc                ; a bsr $1fa2 after the Sega Logo
+000007CC  6100 F83A                 74          bsr $0008               ; just going to use the vector table, since errors aren't tolerated anyway
+000007D0                            75          
+00000008                            76          org $8
+00000008  7E01                      77          moveq #1,d7
+0000000A  11C7 F079                 78          move.b d7,$f079.w       ; set RAM $f079 to 1 to unlock extra music
+0000000E  6000 1F92                 79          bra $1fa2               ; original continue point</PRE>Now 
+it just has to be inserted:<BR><BR>At $0008, replace "0000 0380 0000 0384 0000" 
+with "7e01 11c7 f079 6000 1F92"<BR>At $07CE, replace "17D4" with 
+"F83A"<BR><BR>Finally, I needed the new checksum. A breakpoint at $364 covers 
+that, letting me read the value from D7.<BR><BR>At $018E, replace "D9F6" with 
+"BA5C"<BR><BR>This works well and gives that little option. More work to do 
+though.<BR><BR>Of course, I should mention the building of the cart image... it 
+just expects each ROM to start at a 1MB boundary, menu at zero. So the menu, TF2 
+and TF3 are padded up to 1MB each, then concatenated together. Easy peasy. 
+</BODY></HTML>

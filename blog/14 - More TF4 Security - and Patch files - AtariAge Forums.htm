@@ -1,0 +1,33 @@
+<!DOCTYPE HTML>
+<html><body>
+<H1 class="ipsType_pagetitle">More TF4 Security - and Patch files</H1>
+<DIV class="desc">														Posted by <STRONG><A title="View Profile" class="_hovertrigger url fn name " 
+href="http://atariage.com/forums/user/12959-tursi/" data-ipb="noparse" 
+hovercard-id="12959" hovercard-ref="member"><SPAN 
+itemprop="name">Tursi</SPAN></A></STRONG>, 																													29 
+December 2014							 · 							3 views						 </DIV><BR class="clear"></DIV>
+<DIV class="entry_content ipsType_textblock ipsPad">																			I had a 
+playthrough of TF2 and TF3 without incident, but TF4 was still having problems. 
+I found two specific spots that locked up, and was able to save state them to 
+track things down. Eventually, I found a second checksum routine at $781E, which 
+was triggering after the power up animation where you get the enhanced 
+CLAW.<BR><BR>It's pretty much the same as the first one:<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0"> lea $80.w, A0
+ moveq #$0,d0
+ adda.l a0,a0
+ adda.l a0,a0		&lt;--- $200
+ move.w #$2b80,d7	&lt;--- to $AFFF
+ subq.w #1,d7
+782e:
+ add.l (a0)+,d0
+ dbra d7,$782e
+ cmp.l $bff8.l,d0  &lt;-- d3fbb88a -- mine is c3eeb886
+ bne $5aa6
+ bra $2ece
+</PRE>I 
+set extra breakpoints and played through the end. The original checksum code at 
+$5CAE was called in ten different places, and this new function was called after 
+every white screen wipe.<BR><BR>So, had to change this extra checksum, and again 
+the main cartridge checksum:<BR><BR>BFF8 - change "D3FB B88A" to "C3EE 
+B886"<BR>018E - update to "08F5"
+</BODY></HTML>

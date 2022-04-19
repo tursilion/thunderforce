@@ -1,0 +1,32 @@
+<!DOCTYPE HTML>
+<html><body>
+<H1 class="ipsType_pagetitle">Some progress...</H1>
+<DIV class="desc">														Posted by <STRONG><A title="View Profile" class="_hovertrigger url fn name " 
+href="http://atariage.com/forums/user/12959-tursi/" data-ipb="noparse" 
+hovercard-id="12959" hovercard-ref="member"><SPAN 
+itemprop="name">Tursi</SPAN></A></STRONG>, 																													23 
+December 2014							 · 							102 views						 </DIV><BR class="clear"></DIV>
+<DIV class="entry_content ipsType_textblock ipsPad">																			I took a 
+look at the startup issues in Thunder Force III, and found that it was crashing 
+on the first vertical blank interrupt, which was set to vector into RAM. I found 
+that TF3 (and TF4 for that matter) check the control registers to see whether 
+they are doing first init or not, and skip a lot of set up in they are not. For 
+TF3's sake, the result was a fatal crash.<BR><BR>Adding this code into the 
+trampoline function fixed TF3:<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0">move.w #0,$A11200	; put the Z80 (and YM2162) in reset
+move.w #$8004,$c00004	; VDP R0 = 04 (disable IE0)
+move.w #$8104,$c00004	; VDP R1 = 04 (disable IE1)
+move.w #$8B00,$c00004	; VDP R11= 00 (disable IE2)
+clr.l $A10008		; TF3, at least, uses these registers to decide whether to do a full init!
+clr.l $a1000c		; zeroing them should force a proper initialization</PRE>I 
+also added the TMSS code from the TMSS ROM -- basically checking if the Genesis 
+has security hardware, and zeroing the security register if so, which is what 
+the TMSS BIOS does. But I don't have a machine I can test that on... maybe it's 
+not necessary.<BR><BR>Sadly, the above code patch did not fix TF4's lockup, so 
+there is more to do there. Also, I looked more closely at TF2, and it shows two 
+odd behaviours that the emulator does NOT -- for one, it always thinks it's in 
+Japanese mode (even though the other games do not), and for two, it locks up 
+when the game is started. But these two things happen only on hardware, and I 
+don't have an easy way to test that right now, so I will next need to look at 
+TF4. 
+</BODY></HTML>

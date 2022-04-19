@@ -1,0 +1,66 @@
+<!DOCTYPE HTML>
+<html><body>
+<H1 class="ipsType_pagetitle">Thunder Force Multicart PCBs</H1>
+<DIV class="desc">														Posted by <STRONG><A title="View Profile" class="_hovertrigger url fn name " 
+href="http://atariage.com/forums/user/12959-tursi/" data-ipb="noparse" 
+hovercard-id="12959" hovercard-ref="member"><SPAN 
+itemprop="name">Tursi</SPAN></A></STRONG>, 																													03 
+January 2015							 · 							45 views						 </DIV><BR class="clear"></DIV>
+<DIV class="entry_content ipsType_textblock ipsPad">																			The PCBs 
+arrived today, a little later than I hoped, but still with time to play with 
+them.<BR><BR>For my first stab at a cartridge PCB, they're not bad. I went with 
+the cheap non-solder-mask, non-silkscreen versions to test.<BR><BR>There were 
+four problems with them.<BR><BR>The first problem was they were slightly too 
+wide, it made for a very tight fit... I trimmed less than half a millimeter off 
+the edge to solve that. I fixed this in the layout file.<BR><BR>The second was 
+that the card edge was not beveled, but I knew this going in because ExpressPCB 
+doesn't do beveling as far as I know. I used the dremel to bevel the edge as 
+well. It's not perfect, but it works. ;)><BR><BR>The 
+third was that one of my traces didn't actually make it to the pad -- it was 
+there, but was just barely not touching. Fixed that both on the board and in the 
+layout file.<BR><BR>The fourth was an outright layout error - one of the EPROM 
+control pins was left floating when it needed to be tied high. That needs a 
+jumper wire, but I patched that up too.<BR><BR>The final problem I simply didn't 
+foresee. I had intended to use ZIF sockets on the first board to more easily 
+test the ROMs, and I hadn't realized that the ZIF sockets were MUCH larger than 
+the raw ICs, not to mention they wouldn't fit in the Genesis. So, I extended the 
+pins on one socket, and attached just it for testing.<BR><BR><A title="tfmulticart.jpg - Size: 2.49MB, Downloads: 0" 
+class="resized_img" id="ipb-attach-url-372119-0-55708000-1420358611" href="http://www.atariage.com/forums/uploads//monthly_01_2015/blogentry-12959-0-70028400-1420280791.jpg" 
+rel="lightbox[11616]"><IMG width="500" height="375" class="attach" id="ipb-attach-img-372119-0-55708000-1420358611" 
+alt="Attached Image" src="15%20-%20Thunder%20Force%20Multicart%20PCBs%20-%20AtariAge%20Forums_files/blogentry-12959-0-70028400-1420280791_thumb.jpg"></A> 
+<BR><BR>The good news, is that Thunder Force 2 and the menu work perfectly on 
+this, without the oddities I saw on the previous cartridge. (At least so far). I 
+am going to independently test 3 and 4 with the single EPROM approach before I 
+got for soldering one together permanently.<BR><BR>But, before I went that far, 
+I did one more thing. I felt bad that Thunder Force IV was not region free while 
+2 and 3 were, so I undertook to fix that.<BR><BR>I found three parts that read 
+the region register:<BR><BR>First part:<BR>
+<PRE class="prettyprint lang-auto linenums:0">0482	move.b $a10001,d0		read version reg
+	and.w #$80,d0			mask out region
+	move.w d0,$f0b6.w		Store REGION at $f0b6
+</PRE>Second 
+part:<BR>
+<PRE class="prettyprint lang-auto linenums:0">0542	move.b $a10001,d0		read version reg
+	and.w #$40,d0			mask out tv
+	bne invalid			if PAL, branch
+	tst.w $f0b6.w			check region
+	bne $620			go ahead and run if not Japan
+invalid:
+	bsr $2444			failure?
+</PRE>third 
+part (after Sega logo -- this is just deciding whether to say Technosoft or 
+Tecnosoft):<BR>
+<PRE class="prettyprint lang-auto linenums:0">c3a2	tst.b $a10001			test version register
+	bmi $c3b4			branch if not Japan
+</PRE>So, 
+presumably, all we really need to do is set the "bne invalid" in the second 
+block to "bra $620". Then, of course, we update the three game checksums 
+previously discussed.<BR><BR>They were pretty paranoid about region coding, 
+eh?<BR><BR>Anyway, the branch is too far for a short jump, so we end up 
+overwriting both the bne and part of the tst.w. But, this should be 
+okay.<BR><BR>So, at $54C, replace "6608 4a78" with "6000 00D2"<BR>At $15FF8, 
+replace the checksum with "F9A3 23AF" - this should let you collect 1-ups<BR>At 
+$BFF8, replace the checksum with "BDE6 6EE0" - this should let you clear the 
+second half stages<BR>At $18E, replace the checksum with "0977" - this should 
+let it boot.
+</BODY></HTML>

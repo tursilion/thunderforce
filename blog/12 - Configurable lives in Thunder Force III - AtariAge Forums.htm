@@ -1,0 +1,260 @@
+<!DOCTYPE HTML>
+<html><body>
+<H1 class="ipsType_pagetitle">Configurable lives in Thunder Force III</H1>
+<DIV class="desc">														Posted by <STRONG><A title="View Profile" class="_hovertrigger url fn name " 
+href="http://atariage.com/forums/user/12959-tursi/" data-ipb="noparse" 
+hovercard-id="12959" hovercard-ref="member"><SPAN 
+itemprop="name">Tursi</SPAN></A></STRONG>, 																													29 
+December 2014							 · 							48 views						 </DIV><BR class="clear"></DIV>
+<DIV class="entry_content ipsType_textblock ipsPad">																			For 
+kicks, it seemed fair to do the same thing in Thunder Force III.<BR><BR>However, 
+Thunder Force III doesn't /have/ a lives select, only a 'ship speed' and 'game 
+level' option. This makes things a bit harder!<BR><BR>I started by going back to 
+the hacking documentation I linked in an earlier blog, and looking for anything 
+to do with player lives. The function list included one called 'StyxCollision' 
+at $3f56 that seemed promising, so, I set a breakpoint there. Then, I started a 
+game, intending to die.<BR><BR>Unfortunately, this was called immediately, and 
+didn't seem to have much to do with lives. The next one, "StyxFailure" at $4178, 
+seemed to work and was called when I collided with an enemy. Okay 
+then!<BR><BR>At first glance it didn't seem to do much, so I stepped through. 
+When it eventually did a bsr to $532c, I checked the notes and saw that was 
+PlaySound1. So that made sense. I skipped over the call and looked a little 
+further, and then at $41AE hit this:<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0"> 
+ subq.w #1,$fff2b4.l
+ bmi $41c2
+</PRE>$F2B4 
+contains '4', which is reasonable for this. So, to test I found the right 
+address, I set it to $63, then continued. This worked! (And when the collision 
+code was immediately called again, I found that $A808 contains the countdown for 
+how far forward the new ship moves, and while I'm not sure what $A802 is meant 
+for, setting it makes you invincible.)<BR><BR>So next was the issue of how to 
+select 99 lives on the options menu. Mostly I found myself eyeing ship speed, 
+since it seemed the least useful (you can change speed in game, don't need it 
+here!) I also had to decide just how hacky to be... in the end, I decided to go 
+ahead and just replace it altogether with a plainly labelled 'lives' 
+count.<BR><BR>You may remember my previous TF3 hack for weapon sounds reserved 4 
+bytes at the top of RAM, and I went through a lot of work to protect those bytes 
+(probably foolishly), then only used 1 bit. Well, now we can use another byte. 
+My first hack pokes around with $FFFE.w, so I'll go ahead and use $FFFC.w as the 
+values for setting lives. Someday, I may wish I used bytes, but hopefully this 
+will be the end of it.<BR><BR>That decided, there are three things to do: 1) 
+update the menu for numeric entry, 2) store the result at $FFFC, and 3) use that 
+value when starting the game.<BR><BR>For the first thing, it seemed easiest to 
+replace the text first off. To save needing to hack the checksum every boot, I 
+turned autofix checksum on. I try to leave that off because forgetting then 
+burning an EPROM really sucks. ;) 
+But this will be enough trouble as it is.<BR><BR>First, I had to find 'SHIP 
+SPEED'. That's easy enough with most hex editors. There was a catch, of course, 
+the space was not ' ' but rather '@' (searching just for 'SPEED' found it). It's 
+always important to repeat your search to make sure there is only one hit, to 
+make sure you're in the right place - in this case, there was only one 
+hit.<BR><BR>Rather than worry about how it determines string length, we can just 
+pad it with spaces.<BR><BR>So, at $6854, replace "SHIP@SPEED" with "LIVES@@@@@". 
+A quick test showed that worked fine and did not appear to interfere with the 
+game.<BR><BR>The next part is tricky. The display for that line displays the 
+text "LOW/MID/HIGH/TOP", and we want numbers. I doubt I'd even have attempted 
+this without the hacking document, since they did all the work already. (Of 
+course, we could also have written completely new code, but this was supposed to 
+be quick, like TF2 was!)<BR><BR>The memory map in the hacking document shows the 
+velocity select in the options menu is located at $69B2, with the texts at 
+$69D8-$6AEA. To start, we'll take a look at how that 
+works.<BR><BR>Interestingly, that function is called twice on entry to the 
+Configuration Screen, but it is also called when the entry is selected. We see 
+this code. I poked around a bit to verify the intent of the code:<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0"> move.w #$14,$f20c.w	value is 20 (mid screen, maybe?)
+ move.w #$27,$f20e.w	value is 39 (?)
+ move.w $f34c.w,d0	get the current value of speed setting
+ and.w #$3,d0		mask down to 0-3
+ mulu.w #$5,d0 		multiply by 5, each word is padded to be 5 chars long
+ movea.l #$69d8,a0	$69d8 is the ROM location for the word 'LOW  '
+ lea (a0,d0.w),a0	adds them together to get a final address into A0
+ bra $4bfe		almost certainly a string display (doc calls it 'DisplayTxt')
+</PRE>So 
+that is where the string is displayed. It's not really what we wanted, but we 
+know now that the address being changed is $f34c, so we can set a breakpoint on 
+that memory location instead. For this, moving left made it breakpoint at $6980, 
+at a BCC. I disassembled from a little earlier and found this at 
+$6976:<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0"> btst #$2,D0		check for joystick left
+ beq chkright		not set, jump to $698a
+ subq.w #1,$f34c.w	speed setting down one
+ bcc notneg		jump if not negative
+ clr.w $f34c.w		reset a negative value to zero
+notneg:
+ bsr $69b2		display velocity string (we just looked at this above)
+ bra $6960		presumably, loop around and repeat the scan loop
+
+chkright:
+ btst #$3,d0		check for joystick right
+ beq notright		branch if not set to $69a6
+ addq.w #1,$f34c.w	speed setting up one
+ cmpi #$3,$f34c.w	check for maximum of 3 (0-3)
+ bls nothigh		branch if not too high
+ move.w #3,$f34c.w	reload value with 3
+nothigh: 
+ bsr $69b2		display velocity string
+ bra $6960		loop around (presumably)
+ 
+notright:
+ bra $6960		loop around (odd that it comes here for nothing, but not unusual)
+</PRE>So 
+that definitely covers the menu entry, and it's what we'll need to change. 
+Presumably the changes are already starting to look obvious, but there's the one 
+problem of not knowing how to display digits instead of a string. For that, 
+let's take a peek at the music select line.<BR><BR>The document has something in 
+the area for music test at $6880, so we'll start with that. Alas, breakpointing 
+there does nothing (it appears that is just the text). We also see 
+'MusicTestData1' at $6b18, so I tried a breakpoint on reading there and select 
+the first music. That worked, and stopped at $6AF0. So I disassembled back a 
+bit, and found this at $6AAA:<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0"> btst #$2,D0		check for joystick left
+ beq notleft		branch if not set to $6ac2
+ subq.w #1,$f344.w	decrement music index
+ bcc nowrap		branch if it didn't go negative
+ move.w #$15,$f344.w	it went negative, so wrap around to $15 (21)
+nowrap:
+ bsr $6b4c		draw routine? hacking document does NOT cover this.
+ bra $6a8e		presumably loop around
+ 
+notleft:
+ btst #$3,D0		check for joystick right
+ beq notright		branch if not set to $6adc
+ addq.w #1,$f344.w	increment music index
+ cmpi.w #$15,$f344.w	check for maximum
+ bls nowrap2		branch if not too high
+ clr.w $f344.w		set to zero on wrap
+nowrap2:
+ bsr $6b4c		draw routine?
+ bra $6a8e		loop around?
+ 
+notright:
+ and.w #$f0,d0		mask off just the buttons
+ beq $6a8e		loop around if none pressed
+ movea.l #$6b18,a0	get address of music table...
+</PRE>From 
+there it just handles looking up and playing the music. But that's not enough 
+information, we need to look into $6b4C to see how the digits are drawn (and 
+importantly, positioned!) Breakpoint there and change the 
+number...<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0"> move.w #$14,$f20c.w	loads '20', probably x position
+ move.w #$2b,$f20e.w	loads '43' - something to do with Y.. 4 more than the speed row which is right...
+ move.w $f344.w,D0	loads the value of the music index into D0
+ bra $4dce		branch to $4dce - also not in the hack doc, but it seems likely we got it.
+</PRE>Note 
+how this ends with a BRA, but is called with a BSR. This means the RET in the 
+$4DCE subroutine will return to our caller.<BR><BR>The 'y' coordinate is weird, 
+but, it is predictable based on what we already know. So let's just go ahead and 
+see what happens if we use it.<BR><BR>Right about this time I realized that it 
+was going to be a bit of a pain making it FIT, because the speed select code 
+does not wrap around at zero, and uses a bcc rather than comparison for the 
+lower value. These are smaller, faster operations, but they mean that it will be 
+hard to fit the replacement code in the same place. Also, it bugged me a lot to 
+be replacing the speed select.<BR><BR>I decided instead, to replace the voice 
+test. It was already numeric, and it wraps. It wraps at zero, but because it has 
+a button press as well, there's a little more space for the replacement code. 
+And we don't lose the (arguably not very useful) speed setting.<BR><BR>Since the 
+only hack so far was the speed text, I went back and undid that. But now, of 
+course, I had to find the voice test line.<BR><BR>The text was easy, found that 
+at $68AC and changed "VOICE@TEST" to "LIVES@@@@@". For the test itself, the 
+document shows the VoicesPtrTable at $73478, so that was the address I watched. 
+That didn't work though.<BR><BR>At this point, with not much to go on, I 
+disassembled the code after the above, and just looked for more joystick reads. 
+I found a set at $6B82, modifying $F346, which was likely sound effects. Another 
+one at $6c16 proved to be the one, however. Very similar to the music test 
+above, except with a range of 0-6, and updating $f348.<BR><BR>With that choice 
+made, and only mild misgivings, I went ahead. Since more than ranges had to be 
+changed, it was easier to use the assembler and just overwrite the whole block. 
+Its loop point appeared to be $6BFC, otherwise I was free to replace code. We 
+also have to remember that the life counter ($f2B4) in this game contains the 
+exact displayed value, and defaults to 4 lives. We'll allow a range from 1-99, 
+like the TF2 hack. And the display subroutine (there is one now!) is at 
+$6c64.<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0"> btst #$2,D0		check joystick left
+ beq notleft		branch if not
+ subq.w #1,$fffc.w	decrement count
+ cmpi.w #$FFFF,$fffc.w	test against FFFF (wraparound)
+ bne nowrap1		no need to wrap
+ move.w #$62,$fffc.w	store 98 (99 total)
+nowrap1:
+ bra disp		jump ahead to display
+
+notleft:
+ btst #$3,d0		check joystick right
+ beq $6bfc		not valid, just loop
+ addq.w #1,$fffc.w	increment count
+ cmpi.w #$62,$fffc.w	test against maximum
+ bls nowrap2
+ move.w #$0,$fffc.w	store '0'
+nowrap2:
+disp:
+ bsr $6c64		display new value
+ bra $6bfc		wrap around
+</PRE>This 
+assembles to this block of code, that we drop in at $6c16. It ends at $6c4B, we 
+have till $6c59.<BR><BR>6C16: 0800 0002 6714 5378 fffc 0c78 FFFF fffc<BR>6606 
+31fc 0062 fffc 6018 0800 0003 67c6<BR>5278 fffc 0c78 0062 fffc 6306 31fc 
+0000<BR>fffc 611A 60B0<BR><BR>We also need to fix the display code before we can 
+test this, as it displays the wrong variable. Breakpointing at $6C64 quickly 
+showed the address to patch:<BR>6c72: change "F348" to "FFFC"<BR><BR>And, it's 
+necessary to replace $6C64 with a function that adds 1 to the value. this 
+function is called on entry to the screen and when you change its value, and 
+there isn't much room around it. But, we have some bytes free above, and all we 
+need to do is sneak in an increment. The function looks like this:<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0"> move.w #$14,$F20C.w	load column
+ move.w #$2F,$f20e.w	load row (encoded somehow)
+ move.w $fffc.w,D0	load value (after hack!)
+ bra $4dce		go print number
+</PRE>So, 
+we can just replace that bra with a branch to our code, increment d0, then go on 
+to 4DCE. At $6c4C (spare room from above). This uses to $6c51 (still 8 bytes 
+free).<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0"> addq #1,d0		increment value
+ bra $4dce		go print
+</PRE>6C4C: 
+5240 6000 e17e<BR>6c76: replace "e158" with "ffd6"<BR><BR>Save and test at this 
+point, and you should see lives instead of voice test, and be able to select 
+from 01 to 99. Pressing the button should do nothing. Note, it may start at a 
+strange value, or 0, and it won't have any effect yet. Also test that if you 
+exit config and come back in that it remembers the value.<BR><BR>Menu is fixed, 
+so there are two tasks left - initialize it with a meaningful value (4), and 
+make it actually take effect.<BR><BR>Initialization is easy - we already added 
+code that makes it set the weapons sound flag on. This is located at $7194, and 
+is just two instructions (a bset, and a branch). Unfortunately, immediately 
+after it is some related code, meaning we don't have enough room to insert the 
+new initialization code there.<BR><BR>So, heck with it. We'll just move the 
+startup code a little further down - the next free spot is at 
+$71DE:<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0"> bset #$0,$fffe.w	enable weapon sounds
+ movei.w #$4,$fffc.w	set default of 4 lives
+ bra $200		go to real entry point
+</PRE>71DE: 
+08f8 0000 fffe 31fc 0004 fffc 6000 9014<BR><BR>and change the entry 
+point:<BR>0004: 0000 71DE<BR><BR>Load that, and when you enter the configuration 
+screen, lives should be set to 04 by default. All that is left now is to update 
+the code that initializes it at the beginning of a game! For that, set a memory 
+breakpoint on $f2b4, so we can see when it is loaded. For me, it came up right 
+after the stage select, at $0502. Disassembling the area found this code at 
+$4F2:<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0"> clr.w $f2bc.w
+ move.w $f34c.w,$f2be.w
+ move.w #$4,$f2b4.w		&lt;---- here it is
+ move.l #$7d0,$f2b6.w</PRE>It's 
+in a reasonable area and doing what we expected.. if this is really it, all we 
+need to do is change it from an immediate value, to our stored value. So "move.w 
+$fffc.w,$f2b4.w". Should be the same size instruction.<BR><BR>04Fc: Change "31fc 
+0004" to "31F8 FFFC"<BR><BR>Now load it up and DO NOT enter the config screen - 
+make sure you start with 4 lives. Reset, change to some other value, and make 
+sure you start with that.<BR><BR>Now, finally, before we declare it done, we 
+need to fix the checksum. Breakpoint on reading $18E and turn OFF autofix 
+checksum.<BR><BR>I get a value of $3bC8 in D0, so drop that at $18E, and make 
+sure it works.<BR><BR><A title="tf3lives.jpg - Size: 118.84KB, Downloads: 0" 
+class="resized_img" id="ipb-attach-url-371383-0-22457100-1419913319" href="http://www.atariage.com/forums/uploads//monthly_12_2014/blogentry-12959-0-17766900-1419851130.jpg" 
+rel="lightbox[11597]"><IMG width="500" height="399" class="attach" id="ipb-attach-img-371383-0-22457100-1419913319" 
+alt="Attached Image" src="12%20-%20Configurable%20lives%20in%20Thunder%20Force%20III%20-%20AtariAge%20Forums_files/blogentry-12959-0-17766900-1419851130_thumb.jpg"></A> 
+<BR><BR>You'll get some killer high scores with 99 lives, so no cheating on 
+contests. ;)<BR><BR>So, 
+that was a lot of work, but you can also see that just locking down a different 
+count would be easy - change the 0004 at $04fE to whatever you like, and you're 
+set. But it's nicer to have it configurable, isn't it?
+</BODY></HTML>

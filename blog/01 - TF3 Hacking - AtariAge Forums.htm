@@ -1,0 +1,221 @@
+<html><body>
+<H1 class="ipsType_pagetitle">TF3 Hacking</H1>
+<DIV class="desc">														Posted by <STRONG><A title="View Profile" class="_hovertrigger url fn name " 
+href="http://atariage.com/forums/user/12959-tursi/" data-ipb="noparse" 
+hovercard-id="12959" hovercard-ref="member"><SPAN 
+itemprop="name">Tursi</SPAN></A></STRONG>, 																													14 
+December 2014							 · 							122 views						 </DIV><BR class="clear"></DIV>
+<DIV class="entry_content ipsType_textblock ipsPad">																			For lack 
+of anywhere else to write a retro tech blog, I figured I'd give this place a 
+shot. FWIW, all my posts are likely to be long.<BR><BR>Thunder Force III was 
+bar-none my favorite Genesis game. It sold me on the system and I've honestly 
+never stopped playing it. And one of the things that sold me the most on it was 
+the music.<BR><BR>Unfortunately, this awesome soundtrack used all the FM audio 
+channels on the machine. And weapons also used a channel or two. So when you 
+fired, channels were subtracted from the music.<BR><BR>Thunder Force III is a 2d 
+scrolling shooter. There are very few places where it's wise to take your finger 
+off the fire button to listen to the music. (I had a few memorized though). I 
+always wished for a way to play through without sacrificing the music.<BR><BR>So 
+a few years ago, after locating some docs on TF3's internals over here (<A 
+title="External link" class="bbc_url" href="http://www.romhacking.net/documents/465/" 
+rel="nofollow external">http://www.romhacking.net/documents/465/</A>), I decided 
+to take a stab at muting the weapons. All the other sounds are part of the game, 
+and I left intact (and I rarely noticed them stealing channels anyway).<BR><BR>I 
+had a couple of missteps on that project. The first was I tested all my changes 
+in emulation, and then I burned it to an EPROM. I was very proud of my plan -- I 
+mounted the EPROM on the /bottom/ of the PCB, leaving the original ROM in place, 
+and mounted a switch to select. You couldn't change it at runtime (switch 
+debounce will cause a bad read and a crash), but you could select weapon sounds 
+or not before starting up at least, and all in one TF3 
+cart.<BR><BR>Unfortunately, I powered it up with my ROM, and got a dead screen. 
+This was pretty disappointing, and then I remembered there was a checksum on 
+Genesis carts. I went through the emulator for an explanation -- and sure enough 
+"auto-fix checksum" existed. I learned something there, but I also had a problem 
+-- what was my new checksum, and how the heck was I going to fix the EPROM 
+without desoldering the whole darn thing?<BR><BR>The checksum I got easily 
+enough - by setting a breakpoint when the checksum word was read from the 
+cartridge header, I found the checksum function and read what the Genesis had 
+calculated for my ROM. Now I knew the right value, but how was I going to fix 
+it?<BR><BR>EPROMs (and flash, for that memory) are interesting devices. They are 
+"erased" by charging every cell, so that the cell's value is '1', and 
+"programmed" by draining that charge away to make '0'. In other words, you can 
+always change a '1' into a '0'. I first checked whether I could fix the checksum 
+word by only changing bits to 0, and that was not possible. So I had to make the 
+cartridge match the original checksum. Scanning through the ROM with a hex 
+editor, it was clear there were large unused areas, conveniently set to $FF (ie: 
+ALL bits set). I calculated a difference, and changed two bytes in the middle of 
+one of these areas. A quick test in the emulator verified my new checksum 
+matched. Now, since I fortunately hadn't trimmed the EPROM pins yet, I was able 
+to plug it into the programmer again, and re-program it. Words that were the 
+same wouldn't change, just those two bytes I modified. And this worked. The 
+result is here:<br>
+https://www.youtube.com/watch?v=mXe8bm7VnwY
+<BR><BR>Backstory complete, we come to last 
+night and the long part. ;)
+<BR><BR>I 
+picked up some 4MB EPROMs and got it into my head that I wanted a Thunder Force 
+multicart, with menu and the works. Although 4MB is lots of memory (2 and 3 are 
+512k, and 4 is 1MB), the easiest way to do the bank switching is to divide it 
+into 4 banks of 1MB. That left me unsure what to do with my hack, though, since 
+one bank is easiest devoted to the menu. So I decided there was no reason why I 
+couldn't make the weapon sound an in-game toggle.<BR><BR>I decided to put it as 
+a keypress during pause. When paused, TF3 lets you adjust your speed and 
+selected weapon, only the fire button does nothing. So that seemed 
+ideal.<BR><BR>I started out to trace how the existing keypresses work by pausing 
+the game, then setting a breakpoint on reading the joystick. I was able to 
+determine that the joystick read function was identical to what the FAQs I had 
+collected listed - clearly a standard library. Both joysticks are read and 
+saved, despite TF3 only using one.<BR><BR>In tracing this code, I found a rather 
+clever sequence I've never seen before that provides leading edge detection in 
+just two instructions - I'd always manually checked this myself. It's common to 
+save the "last" read in order to detect held keys and the like. TF3 goes a 
+little further - using "EOR new,old" then "AND new,old", it ends up with a word 
+that contains only newly set bits (assuing '1' bits mean pressed). This is great 
+for menus and options and saved me having to deal with that, since a held key on 
+a toggle would otherwise be trouble.<BR><BR>It took only a little longer to find 
+the code jumping into a small function that checked specifically the weapon 
+select and speed change buttons, then returned. Setting a breakpoint there 
+proved that this was only called during pause mode - it seemed like I found my 
+hook. Now I could start to write code.<BR><BR>I replaced a subroutine call to 
+branch to one of those large blocks of $FF bytes I mentioned before, and now I 
+just had to write some code. The one catch was to keep the branches short, I 
+selected a block in the first 64k of the cart. I used a standard 68k assembler 
+and used the listing file to get the output bytes - this saved me from needing 
+to hand assemble or calculate offsets.<BR><BR>Although large regions of memory 
+looked untouched, it always makes me nervous to assume that, so rather than play 
+through many times and try to hit every possible case, I did an old trick and 
+pushed the stack down. The 68k stack normally starts at the very top of RAM (in 
+fact it's set to $00000000 in all the ROMs I've seen). I nudged it down 4 bytes 
+in the header (to make later fixes easier - I only need a bit).<BR><BR>So my 
+next task was to initialize, modify, and protect that new word. First I created 
+the new pause button-check code. I copied the tests for the other two buttons, 
+making life easier:<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0">			org $7180
+	0838 0004 f1f3	btst #$4, $f1f3.w	; check new buttons for fire
+	6700 0008	beq done		; not set
+	0878 0000 fffe	bchg #$0, $fffe.w	; invert the bit
+done:
+	6000 ca34	bra $3bc6		; continue with original call
+</PRE>I 
+was using the top word, but I moved the stack 4 bytes after I'd written all that 
+code, as the memory zeroing code used 32-bit writes - I found that later. $f1f2 
+contains the filtered new buttons of both joysticks, so $f1f3 was joystick 0. 
+bit 4 is normally 'B', which is fire, but if TF3 remaps the keys it ensures the 
+functions still map to the correct bits.<BR><BR>So, all this does is check, if 
+Fire is newly pressed, invert the flag bit. the code then jumps to the original 
+subroutine whose call it replaced. Since it uses BRA instead of BSR, the 
+subroutines RTS will return to the original caller.<BR><BR>I was able to test 
+with that much and a debugger, of course, and see the bit was toggling, but it 
+initialized to 0. It probably would have been easier to leave that as 'on' and 
+use 1 as 'off', but I get stubborn sometimes...<BR><BR>So now I needed new 
+initialization code that would set the bit to '1'. I decided the simplest way 
+was to change the entry point, so I let the assembler tell me the next open 
+address, and wrote this simple code:<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0">entry:
+	08f8 0000 fffe	bset #$0, $fffe.w	; set the bit for weapon sounds
+	6000 9064	bra $0200		; jump to real entry point</PRE>I 
+then changed the entry vector to point here instead of $0200 as originally set. 
+All it does it ensure that my bit is set, and jump to the original 
+code.<BR><BR>Unfortunately, it didn't work! Stepping through the code I could 
+see my bit set, then cleared. Eventually, I identified two loops that were 
+zeroing RAM.<BR><BR>The first one counted up and was easy enough to just reduce 
+the count by one dword, but the second one was tricky, and it took me a couple 
+of passes to figure it out. The first problem was the start address was set by 
+move d0 (previously cleared to 0) to A6, and then zeroing using predecrement 
+mode on A6. I finally realized that moving A7 (stack pointer) to A6 was the same 
+size instruction and would provide the start point I wanted, so I did that. But 
+my bit was still being zeroed and I was not sure why!<BR><BR>Finally, though, I 
+clued in. The Genesis RAM is mirrored in the upper address space - 64k repeating 
+through $e00000 to $ffffff. I hadn't changed the COUNT of words to zero, and it 
+was simply "wrapping around" when it reached the bottom and zeroing my top word. 
+The count was part of an initialization table, and easily modified. Finally my 
+bit seemed to be preserved, and nothing else appeared to mess with the stack 
+pointer.<BR><BR>Now I went back to my original hack. I had replaced all the 
+weapons sound effects BSRs with NOP NOPs. This time I needed to analyze them - 
+and there were only three entry points: $532c, $1970, and $197E. The TF3 hacking 
+document identified those as a sound effect playback engine, and two Styx 
+(player ship) fire sound requests. Sure enough, the latter two functions did 
+some tests then conditionally branched to $532c.<BR><BR>I didn't need to 
+understand those two functions, but I had to decide what to replace. Of 13 
+patches, though, all but 5 went through those two functions. I briefly 
+considered replacing $532c, but that is used for ALL sound effects, so I'd need 
+to filter which sound was being requested, and that felt like too much trouble. 
+Instead I opted to replace the two Styx fire sound request functions, and 
+directly patch the branches to $532c. For this, I wrote three new subroutines. 
+The first two completely replaced the Styx Fire Sound Request functions - first 
+testing my new bit, then doing the same as they used to do. (They were so short, 
+I didn't bother jumping back to them). The third was a wrapper for $532c that 
+tested my bit before jumping.<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0">styxfire1:				; $1970
+719E	0838 0000 fffe	btst #$0, $fffe.w	; is it set?
+	670c 		beq.s dorts		; no
+	0278 0001 f312	andi.w #$1, $f312.w	; original function at $1970
+	6604		bne.s dorts		; not quite sure
+	6000 e17c	bra $532c		; play the sound
+dorts:
+	4e75		rts
+
+styxfire2:					; $197e
+71B4	0838 0000 fffe	btst #$0, $fffe.w	; is it set?
+	67f6		beq.s dorts		; no
+	0c78 0002 f312	cmpi.w #$2, $f312.w	; original code
+	6504		bcs.s skip1
+	4278 f312	clr.w $f312.w
+skip1:
+	4a78 f312	tst.w $f312.w
+	66e4		bne.s dorts
+	6000 e15c	bra $532c		; play the sound
+						
+directsnd:
+71d2	0838 0000 fffe	btst #$0, $fffe.w	; is it set?
+	67d8		beq.s dorts		; no
+	6000 e150	bra $532c		; play the sound</PRE>Then, 
+at $1970 and $197E, I overwrite the beginning of each function with a BRA to the 
+replacement function. (Again, using ORG directives, I could just write them in 
+the assembler and let it calculate the offsets).<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0">  org $1970
+  bra.s styxfire1
+  org $197e
+  bra.s styxfire2</PRE>and 
+so on.<BR><BR>For the five cases of BSR $532c, they became BSR directsnd, again 
+letting the assembler calculate the offsets.<BR><BR>And that's all! Technically 
+that's more than was needed, I could have done away with all the hacking of init 
+functions by simply inverting the meaning of the bit, or by accepting that sound 
+effects for weapons would be OFF by default, but sometimes when you do a hack 
+incrementally you learn as you go, and it's easier to deal with the new 
+knowledge than undo what you did. ;)<BR><BR>The 
+last thing I needed to do was calculate the new checksum, which again I let the 
+Genesis do, breakpointed, and then stored the correct value in the header - no 
+need to patch FF bytes this time.<BR><BR>It works well, though I still need to 
+play through start to end and verify it is really okay. The game starts up 
+normally... by pausing and pressing fire once, weapons sounds are turned off, 
+and you can repeat to turn them back on. Much nicer than the hardware switch ;)
+<BR><BR>For 
+those who just want to try it, here are the patches. If the original bytes don't 
+match (especially the checksum), you probably have a different version ROM than 
+I did. I don't know if they are out there. ;)<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0">$00000000 - change "00000000" to "fffffffc" - moves stack pointer down 4 bytes to use as data space for hack
+$00000006 - change "0200" to "7194" - change start address to my new entry point
+$0000018E - change "0678" to "c084" - update checksum
+$00000230 - change "2c40" to "2c4f" - patch memory clear routine and user stack pointer
+$000002a2 - change "3fff" to "3ffe" - patch memory clear routine counter (initialization table)
+$00000328 - change "03ff" to "03fe" - patch second memory clear routine (counter)
+$00001388 - change "283e" to "5df8" - changes relative BSR from $3bc6 to $7180
+$00001970 - replace "02780001" with "6000582c" - replace styxfire1
+$0000197e - replace "0c780002" with "60005834" - replace styxfire2
+$000019ea - replace "3942" with "57e8" - replace sfx call
+$00001a70 - replace "38bc" with "5762" - replace sfx call
+$00001aa0 - replace "388c" with "5732" - replace sfx call
+$00001c1a - replace "3712" with "55b8" - replace sfx call
+$00001c50 - replace "36dc" with "5582" - replace sfx call
+$00007180 - replace "FF" bytes with following - inserts above code
+            0838 0004 f1f3 6700 0008 0878 0000 fffe
+            6000 ca34 08f8 0000 fffe 6000 9064 0838
+            0000 fffe 670c 0278 0001 f312 6604 6000
+            e17c 4e75 0838 0000 fffe 67f6 0c78 0002
+            f312 6504 4278 f312 4a78 f312 66e4 6000
+            e15c 0838 0000 fffe 67d8 6000 e150
+</PRE>Double 
+check your work before you save it - a single mistyped character will cause a 
+crash or unexplained behavior. 
+</BODY></HTML>

@@ -1,0 +1,121 @@
+<!DOCTYPE HTML>
+<html><body>
+<H1 class="ipsType_pagetitle">It helps if you plug it in...</H1>
+<DIV class="desc">														Posted by <STRONG><A title="View Profile" class="_hovertrigger url fn name " 
+href="http://atariage.com/forums/user/12959-tursi/" data-ipb="noparse" 
+hovercard-id="12959" hovercard-ref="member"><SPAN 
+itemprop="name">Tursi</SPAN></A></STRONG>, 																													22 
+December 2014							 · 							119 views						 </DIV><BR class="clear"></DIV>
+<DIV class="entry_content ipsType_textblock ipsPad">																			I went 
+ahead and put the logic analyzer on the flipflop, as mentioned, and found that 
+it was neither flipping nor flopping. All the other signals looked as I hoped, 
+everything seemed right. I checked timing on the datasheet, and while the TIME 
+pulse was only 320ns, the flipflop only needed 40ns to do it's thing.<BR><BR>
+Finally I checked power, and found I'd wired the flipflop to ground, so no 
+power. When I fixed that, the menu and TF2 correctly came up and selected. Since 
+the second ROM select wasn't in place yet, TF3 correctly re-selected the menu, 
+and TF4 selected TF2. All seemed good, and the logic signals on the bus were 
+reassuring.<BR><BR>Next it was time to work out the chip selection. My original 
+plan was to run the output of the flipflop directly to !G on one chip, and to 
+invert it for the other.<BR><BR>I went to detach the !G pin on the PCB, and 
+found it was not permanently tied low as I expected, rather, it was tied to the 
+Genesis !CAS0, which is a general purpose read signal. I realized that its 
+purpose was to ensure the ROM only responded to reads, not writes. I'd lightly 
+tested the ROMs never write to ROM by accident (this is a pretty common bug, 
+actually, and doesn't have any impact on real hardware in most cases, but if I 
+subverted this signal so that the EPROM would respond to both reads and writes, 
+a write would crash the hardware.) I decided not to chance it.<BR><BR>I went 
+through a handful of circuits for merging in the !CAS0 select with my flipflop's 
+output bit, remembering that it had to be split into two selects. Finally, I 
+decided the best circuit was to adapt the circuit I had mapped out in the Lion 
+King, using a quad NAND gate (using it as two inverters and two NANDs).<BR><BR>
+Final circuit is something like this:<BR><BR><A title="sch.png - Size: 895.45KB, Downloads: 0" 
+class="resized_img" id="ipb-attach-url-370558-0-85916400-1419913264" href="http://www.atariage.com/forums/uploads//monthly_12_2014/blogentry-12959-0-00419800-1419242785.png" 
+rel="lightbox[11575]"><IMG width="500" height="300" class="attach" id="ipb-attach-img-370558-0-85916400-1419913264" 
+alt="Attached Image" src="07%20-%20It%20helps%20if%20you%20plug%20it%20in___%20-%20AtariAge%20Forums_files/blogentry-12959-0-00419800-1419242785_thumb.png"></A> 
+<BR><BR>I put all this together - the tricky part of this was lifting the !G pin 
+of the EPROM so it was no longer attached to the PCB (I also had to cut the 
+trace for the second chip later). Then I tested again, and again the cart 
+behaved as expected - menu and TF2 worked, 3 and 4 crashed the system now 
+(because the EPROM was disabled and no other EPROM was yet in place), but I 
+checked the pins and they looked right. I took some logic captures showing 
+selection of each menu option here.<BR><BR>To read these, start at the 'T' and 
+look down. Each row is one signal from the circuit.<BR><BR>!RESET is the line 
+from the Genesis for reset - it is active low, that is what the '!' means.<BR>
+ROM 1MB is the output from the FlipFlop used to select the top or bottom 1MB in 
+each EPROM.<BR>A2 and A3 are the Genesis address lines. A2 represents multiples 
+of 4, and A3 multiples of 8. These are the two lines we latch in the 
+flipflop.<BR>ROM Select is the output from the NAND Circuit that selects the 
+first or second EPROM.<BR>!TIME is the I/O select toggle from the Genesis that 
+indicates an address in the range of $A13000 is accessed.<BR>!CAS0 is the 
+general read output line from the Genesis.<BR>!G1 is the !G line going to the 
+first EPROM<BR>!G2 is the !G line going to the second EPROM<BR><BR><A title="TF2.jpg - Size: 91.22KB, Downloads: 0" 
+class="resized_img" id="ipb-attach-url-370559-0-85936300-1419913264" href="http://www.atariage.com/forums/uploads//monthly_12_2014/blogentry-12959-0-35143800-1419242786.jpg" 
+rel="lightbox[11575]"><IMG width="500" height="236" class="attach" id="ipb-attach-img-370559-0-85936300-1419913264" 
+alt="Attached Image" src="07%20-%20It%20helps%20if%20you%20plug%20it%20in___%20-%20AtariAge%20Forums_files/blogentry-12959-0-35143800-1419242786_thumb.jpg"></A> 
+<BR><BR>So here is TF2 being selected. !TIME goes low at the Trigger point (T), 
+but it's the rising edge that matters to the flipflop. You can see at that point 
+that A2 is high, and A3 is low. The flipflop's job is to control ROM 1MB and ROM 
+Select - you can see that ROM 1MB goes high and ROM SELECT stays low - this 
+selects the second bank in the first EPROM, which is correct. Nothing else 
+matters until !CAS0 begins to toggle, at which point we can confirm that it is 
+followed by !G1 and ignored by !G2.<BR><BR><A title="TF3.jpg - Size: 89.15KB, Downloads: 0" 
+class="resized_img" id="ipb-attach-url-370560-0-85955800-1419913264" href="http://www.atariage.com/forums/uploads//monthly_12_2014/blogentry-12959-0-17363700-1419242787.jpg" 
+rel="lightbox[11575]"><IMG width="500" height="236" class="attach" id="ipb-attach-img-370560-0-85955800-1419913264" 
+alt="Attached Image" src="07%20-%20It%20helps%20if%20you%20plug%20it%20in___%20-%20AtariAge%20Forums_files/blogentry-12959-0-17363700-1419242787_thumb.jpg"></A> 
+<BR><BR>Here is TF3. This time A2 is low and A3 is high, which leaves ROM 1MB 
+low and raises ROM Select to select the second EPROM. And we see this reflected 
+when !CAS0 starts toggling, that it is mirrored by !G2 and ignored by 
+!G1.<BR><BR><A title="tf4.jpg - Size: 92.32KB, Downloads: 0" class="resized_img" 
+id="ipb-attach-url-370561-0-85975300-1419913264" href="http://www.atariage.com/forums/uploads//monthly_12_2014/blogentry-12959-0-99643200-1419242787.jpg" 
+rel="lightbox[11575]"><IMG width="500" height="236" class="attach" id="ipb-attach-img-370561-0-85975300-1419913264" 
+alt="Attached Image" src="07%20-%20It%20helps%20if%20you%20plug%20it%20in___%20-%20AtariAge%20Forums_files/blogentry-12959-0-99643200-1419242787_thumb.jpg"></A> 
+<BR><BR>And finally, TF4, where A2 and A3 are both high, and so both ROM 1MB and 
+ROM Select go high. Again we see this map correctly when !CAS0 starts to 
+toggle.<BR><BR><A title="Reset.jpg - Size: 99.53KB, Downloads: 0" class="resized_img" 
+id="ipb-attach-url-370557-0-85891900-1419913264" href="http://www.atariage.com/forums/uploads//monthly_12_2014/blogentry-12959-0-40807700-1419242783.jpg" 
+rel="lightbox[11575]"><IMG width="500" height="236" class="attach" id="ipb-attach-img-370557-0-85891900-1419913264" 
+alt="Attached Image" src="07%20-%20It%20helps%20if%20you%20plug%20it%20in___%20-%20AtariAge%20Forums_files/blogentry-12959-0-40807700-1419242783_thumb.jpg"></A> 
+<BR><BR>You can see, too, in the Reset case that everything goes back to low 
+levels, reselecting the menu.<BR><BR>Finally, then, everything looked right, so 
+I programmed and attached the second EPROM. This one I put on the bottom of the 
+board, since there's not enough room in the shell for piggybacking on top. This 
+isn't really trivial either, and I used resister legs to make longer legs (since 
+you have to put it with the window against the PCB so the orientation matches 
+the chip on top). Then attach !G2 to the correct pin, and plug it in!<BR><BR><A 
+title="CIMG0009.JPG - Size: 1.24MB, Downloads: 0" class="resized_img" id="ipb-attach-url-370563-0-85994900-1419913264" 
+href="http://www.atariage.com/forums/uploads//monthly_12_2014/blogentry-12959-0-76051400-1419242890.jpg" 
+rel="lightbox[11575]"><IMG width="500" height="375" class="attach" id="ipb-attach-img-370563-0-85994900-1419913264" 
+alt="Attached Image" src="07%20-%20It%20helps%20if%20you%20plug%20it%20in___%20-%20AtariAge%20Forums_files/blogentry-12959-0-76051400-1419242890_thumb.jpg"></A> 
+<BR><BR><A title="CIMG1406.JPG - Size: 1.06MB, Downloads: 0" class="resized_img" 
+id="ipb-attach-url-370564-0-86015200-1419913264" href="http://www.atariage.com/forums/uploads//monthly_12_2014/blogentry-12959-0-69376800-1419242892.jpg" 
+rel="lightbox[11575]"><IMG width="500" height="375" class="attach" id="ipb-attach-img-370564-0-86015200-1419913264" 
+alt="Attached Image" src="07%20-%20It%20helps%20if%20you%20plug%20it%20in___%20-%20AtariAge%20Forums_files/blogentry-12959-0-69376800-1419242892_thumb.jpg"></A> 
+<BR><BR>Unfortunately, I had mixed results. TF3 does not start at all. I 
+observed this in emulation, but, I had very little confidence in the emulation 
+since hacking my switching in was so difficult. The emulator claims an address 
+error early in startup, yet the ROM works fine in the emulator on its own, or if 
+its swapped in during a breakpoint. But... it happens on hardware, so this must 
+be real.<BR><BR>Thunder Force II and IV crash during play -- oddly I let the 
+demos run for a long time and had no trouble, but about 5 minutes of play (or 
+just starting TF2) locks it up (the Z80 keeps going, meaning the music doesn't 
+stop, which suggests a 68000 exception). There could be a problem here, or it 
+could just be the long wires picking up interference...? Could even be a cold 
+solder joint. But given the read select signals are running through the wires, 
+and that TF2 worked fine before the additional circuit was added, I'm willing to 
+suspect interference.<BR><BR>All things considered, I think this board has 
+reached the 'trash' state. There's only a little more work I can do to try and 
+figure it out, but no matter what there is a problem with TF3. So this means 
+that I will have to restart the project. (Something I sadly haven't time to do 
+right now).<BR><BR>On the plus side, I've learned that the switching circuit 
+seems to work, and I have a menu. I can fix the debounce issue (it's enough to 
+add a 'sleep 15' after each move for a really cheap debounce). I need to spend 
+more time in the emulator to understand the TF3 crash, and to make sure that TF2 
+and TF4 aren't crashing for software reasons (I don't think so). I suspect 
+making a PCB for the next attempt would be a wise move. ;)<BR><BR>
+So, I have to leave this project at this point. But here's a video showing it 
+partially working, at least!
+
+<a href="https://www.youtube.com/watch?v=h0-Wmo6OrG0">YOUTUBE</a>
+
+</BODY></HTML>

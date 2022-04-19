@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html><body>
+<H1 class="ipsType_pagetitle">TF MultiMenu and Genesis Cartridge Port</H1>
+<DIV class="desc">														Posted by <STRONG><A title="View Profile" class="_hovertrigger url fn name " 
+href="http://atariage.com/forums/user/12959-tursi/" data-ipb="noparse" 
+hovercard-id="12959" hovercard-ref="member"><SPAN 
+itemprop="name">Tursi</SPAN></A></STRONG>, 																													15 
+December 2014							 · 							98 views						 </DIV><BR class="clear">
+<DIV class="entry_content ipsType_textblock ipsPad">																			Today I 
+worked on a menu program. Because I'm lazy, I used Basiegaxorz, a BASIC compiler 
+for the Genny.<BR><BR>I decided it would be simple enough - three banners (one 
+for each game). They would be greyscale unless selected. Up and down to select, 
+and start to start.<BR><BR>First I had to decide sizes. I decided to work with 
+the 320x224 mode. Vertically dividing 224 by 3 gives 74.67 pixels. But 74.6 
+isn't a multiple of 8, and we have a tile-based display. So to make life easier, 
+I rolled that down to the nearest multiple of 8, which is 72 pixels. (72 x 3 = 
+216 pixels, so there's actually one unused tile row. That's fine.)<BR><BR>Width 
+was arbitrary, but I decided that I wanted to horizontally stagger the images, 
+so I picked 256 pixels wide as a rough value. That gives me images that are 32x9 
+tiles in size - 228 tiles total for each one. No problem!<BR><BR>I started with 
+the box covers for TF2, TF3, and Lightening Force (I originally was going to use 
+the European TF4, but I decided I liked the US version better for the tiny 
+changes it has, and I didn't want to deal with region changes). A few minutes on 
+each in Photoshop to overlay the titles on the image in appropriate locations, 
+and I had the images I wanted.<BR><BR>To convert to Genesis format, I used 
+"Retro Graphics Toolkit" from here: <A title="External link" class="bbc_url" 
+href="https://github.com/ComputerNerd/Retro-Graphics-Toolkit" rel="nofollow external">https://github.com/ComputerNerd/Retro-Graphics-Toolkit</A><BR><BR>It 
+took a little time to figure it out, but it does produce pretty decent results 
+with minimal work, and has convenient output modes for working with BEX 
+(including a clipboard output, which I used.)<BR><BR>First thing to do upon 
+opening it is File-&gt;Tilemaps-&gt;Import Image to Tilemap. This loads the 
+image file into the tilemap area for conversion. It asks whether you want to 
+append or overwrite tiles, for simplicity I always overwrote and treated each 
+image independently.<BR><BR>On the Plane Mapping/Block Editor tab, you can view 
+the image - here I have selected Tilemap Actions-&gt;Toggle Truecolor Viewing, 
+just to show you the image. I suggest that you leave it OFF so it's easier to 
+tell what step you're at. (The image will be black at this point 
+instead).<BR><BR><A title="s1.jpg - Size: 90.84KB, Downloads: 1" class="resized_img" 
+id="ipb-attach-url-369681-0-51351100-1419913221" href="http://www.atariage.com/forums/uploads//monthly_12_2014/blogentry-12959-0-09288000-1418642948.jpg" 
+rel="lightbox[11551]"><IMG width="500" height="391" 
+alt="Attached Image" src="02%20-%20TF%20MultiMenu%20and%20Genesis%20Cartridge%20Port%20-%20AtariAge%20Forums_files/blogentry-12959-0-09288000-1418642948_thumb.jpg"></A> 
+<BR><BR>Next, we need to create a palette. The Genesis has a 64-color active 
+palette, split into 4 16-color palettes for the sake of tiles. I decided to give 
+each image a 16-color palette, and then I could just grey out individual 
+palettes for the effect. But, this tool will happily use all the colors, while 
+color 0 in each palette is transparent. To make life easier, I selected color 0 
+on the Palette Editor tab, made sure it was black (my desired background color), 
+and then selected 'locked'. This tells the tool that images are allowed to USE 
+the color (and in this case they are), but they are not allowed to CHANGE that 
+color.<BR><BR>Next it was simply a matter of Palette Actions-&gt;Generate 
+Optimal Palette with X amount of colors. (long menu name). The tool asks how 
+many colors you want - well, I have 16 in the desired palette and one is locked, 
+so I asked for 15. It then asks if you would like all tiles on the tilemap to be 
+set to row 0 ('row 0' also means 'palette 0', or 'the first 16 colors'). So, 
+yes, that's the only one we're using. Next, a color reduction algorithm (I am 
+happy with the default) and the color space (I prefer YUV). Finally, a palette 
+will appear! (Note the 'locked' radio button set for color 0).<BR><BR><A title="p2.jpg - Size: 50.06KB, Downloads: 1" 
+class="resized_img" id="ipb-attach-url-369682-0-51379800-1419913221" href="http://www.atariage.com/forums/uploads//monthly_12_2014/blogentry-12959-0-67894200-1418643306.jpg" 
+rel="lightbox[11551]"><IMG width="500" height="391" class="attach" id="ipb-attach-img-369682-0-51379800-1419913221" 
+alt="Attached Image" src="02%20-%20TF%20MultiMenu%20and%20Genesis%20Cartridge%20Port%20-%20AtariAge%20Forums_files/blogentry-12959-0-67894200-1418643306_thumb.jpg"></A> 
+<BR><BR>Now we just have to dither the image down to this palette. Select 
+Tilemap Actions-&gt;Dither Tilemap as Image. It asks whether to Dither Entire 
+Image at once, or Dither each Palette Row Separately. Well, we only have one 
+palette row anyway, so do it all at once. Switch over to the Plane Mapping/block 
+editor, and you should see the image, dithered. (If you don't like it, you can 
+play with the palette settings).<BR><BR><A title="p3.jpg - Size: 102.38KB, Downloads: 1" 
+class="resized_img" id="ipb-attach-url-369684-0-51403400-1419913221" href="http://www.atariage.com/forums/uploads//monthly_12_2014/blogentry-12959-0-24970000-1418643457.jpg" 
+rel="lightbox[11551]"><IMG width="500" height="391" class="attach" id="ipb-attach-img-369684-0-51403400-1419913221" 
+alt="Attached Image" src="02%20-%20TF%20MultiMenu%20and%20Genesis%20Cartridge%20Port%20-%20AtariAge%20Forums_files/blogentry-12959-0-24970000-1418643457_thumb.jpg"></A> 
+<BR><BR>Next, I opened up the basic editor. We need to export three sets of data 
+from the converter -- the palette, the tilemap, and the tile bitmaps 
+themselves.<BR><BR>So File-&gt;Palettes-&gt;Save Palette. First entry to save is 
+0, last entry is 15 (0-15 is 16 colors). It then asks for the type to save, drop 
+down and select 'BEX' (which is some abbreviation for the BASIC compiler). It 
+can also export Binary, C, and ASM. Finally, It asks Clipboard or File - I 
+wanted clipboard. Then, I just hit paste in the BEX editor.<BR><BR>Repeat the 
+process for the tilemap: File-&gt;Tilemaps-&gt;Save tilemap and if nes 
+attributes (another long name, and we're not doing NES. But never mind.) Select 
+type as BEX, output to clipboard, and then you are asked if you'd like a 
+compression algorithm. For me, this project, I left it uncompressed. Then over 
+to BEX and paste the data into the editor.<BR><BR>Finally for the tiles 
+themselves, File-&gt;Tiles-&gt;Save Tiles. Select type BEX, clipboard, and 
+uncompressed. Then paste into the editor (this will have the most 
+data.)<BR><BR>BEX export always uses the same label names, and since we're 
+planning more than one, I went ahead and renamed the labels, too, prefixing with 
+"tf3" in this case.<BR><BR><A title="p4.jpg - Size: 287.42KB, Downloads: 1" 
+class="resized_img" id="ipb-attach-url-369686-0-51426200-1419913221" href="http://www.atariage.com/forums/uploads//monthly_12_2014/blogentry-12959-0-41978300-1418643850.jpg" 
+rel="lightbox[11551]"><IMG width="500" height="460" class="attach" id="ipb-attach-img-369686-0-51426200-1419913221" 
+alt="Attached Image" src="02%20-%20TF%20MultiMenu%20and%20Genesis%20Cartridge%20Port%20-%20AtariAge%20Forums_files/blogentry-12959-0-41978300-1418643850_thumb.jpg"></A> 
+<BR><BR>I repeated the process with the other two images, until all the data was 
+converted and in place. Now I needed to draw the screen. There's just one small 
+issue to overcome -- all the images are saved as though they use palette row 0. 
+So it is necessary, as we load the tiles to video memory, to update them for 
+where we /really/ want them to be.<BR><BR>Originally, I had thought I'd use a 
+staggered layout, as I mentioned, and put text on the bottom row. But that 
+actually looked rather disorganized and cramped, so, I went for an aligned 
+layout with no text. With that decided, my palette choices became:<BR><BR>- row 
+0 - black (was originally for text)<BR>- row 1 - TF2 palette<BR>- row 2 - TF3 
+palette<BR>- row 3 - TF4 palette<BR><BR>So first it was necessary to set up the 
+system. I decided to put everything on plane B for simplicity (the only reason 
+to set text plane was so the 'cls' function would work and save me some trouble 
+;) 
+):<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0">	OPTION TITLE,"Thunder Force Multicart"
+	OPTION NOLOADFONT
+	BGCOLOR 0,0
+	
+	setgfxplane SCROLL_B
+	settextplane SCROLL_B
+	valt
+	palettes palDat,0,0,16
+	palettes tf2palDat,1,0,16
+	palettes tf3palDat,2,0,16
+	palettes tf4palDat,3,0,16
+	loadtiles tf2tileDat,288,128
+	loadtiles tf3tileDat,288,416
+	loadtiles tf4tileDat,288,704
+</PRE>Here 
+we set the cart title, skip loading the font, set the background color to row 0, 
+color 0 (black!), and set the working planes. "valt" is supposed to wait for 
+vertical blank, this prevents 'snow' on the screen caused by updating video 
+memory as the beam is being drawn. (Or is it only CRAM? Anyway...)<BR><BR>The 
+"palettes" function loads each palette to color RAM - palDat is set to all zeros 
+(and doesn't really need to be loaded now that there's no text), the others load 
+the TF palettes, into each palette row. Finally, the three calls to loadtiles 
+loads the bitmap data into memory - each image is 288 tiles and loads as the 
+listed character offset. TF2 loads at 128 because, again, originally I was 
+leaving room for a font. <IMG class="bbc_emoticon" alt=";)" src="02%20-%20TF%20MultiMenu%20and%20Genesis%20Cartridge%20Port%20-%20AtariAge%20Forums_files/icon_wink.gif"><BR><BR>With 
+that everything is ready to go, but there is nothing onscreen - we need to load 
+the tilemaps. The BEX compiler came with examples, one of which included a very 
+nice assembly subroutine to draw a block of tiles, called DrawTiles16. One very 
+nice feature of this subroutine is the ability to add an offset to the tiles. 
+This solves our needs of both character offset (such as 128), AND palette row 
+offset. In a 16-bit tilemap entry, bits 13 and 14 specify the palette to use. 
+Since all the images were saved for palette zero, we can just add the offset we 
+need. So these lines are added to display the screen:<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0">	DrawTiles16 lblptr&amp;(tf2mapDat),0,0,32,9,&amp;h2080	' palette 1, char 128
+	DrawTiles16 lblptr&amp;(tf3mapDat),7,9,32,9,&amp;h41a0	' palette 2, char 416
+	DrawTiles16 lblptr&amp;(tf4mapDat),0,18,32,9,&amp;h62c0	' palette 3, char 704</PRE>(and 
+of course the DrawTiles16 sub is included in the code too).<BR><BR><A title="p5.jpg - Size: 133.96KB, Downloads: 1" 
+class="resized_img" id="ipb-attach-url-369687-0-51448200-1419913221" href="http://www.atariage.com/forums/uploads//monthly_12_2014/blogentry-12959-0-80671200-1418644671.jpg" 
+rel="lightbox[11551]"><IMG width="500" height="411" class="attach" id="ipb-attach-img-369687-0-51448200-1419913221" 
+alt="Attached Image" src="02%20-%20TF%20MultiMenu%20and%20Genesis%20Cartridge%20Port%20-%20AtariAge%20Forums_files/blogentry-12959-0-80671200-1418644671_thumb.jpg"></A> 
+<BR><BR>I wasn't super fond of the staggering, as I noted, but at least the 
+image was up successfully! Now I needed a way to make the palette 
+greyscale.<BR><BR>One way is to just precalculate the palette and load it as 
+needed, but I wasn't up to that. Instead, I decided I could do it in code. I 
+decided to create an assembly function (although BASIC may have been quick 
+enough for just 16 colors!) - mostly for the practice. To keep the code simple, 
+rather than doing a true greyscale, I decided to just copy the green channel to 
+red and blue.<BR><BR>Genesis colors are rather simply defined in 16 bits as 
+0000bbb0 ggg0 rrr0. Note that although only 9 bits are used for color, there is 
+padding to easily support 12 bit color. It's almost too bad we never saw that 
+enhancement!<BR><BR>The following subroutine is used to load a palette, but 
+changes each color to grey before storing it in the VDP:<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0">' GreyPalette lblptr&amp;(&lt;palDat&gt;), &lt;pal num&gt;, &lt;pal idx&gt;, cnt
+Declare Asm Sub GreyPalette(d5.l, d0.w, d1.w, d2.w)
+	; not really grey, we just copy the green channel to all three guns
+	move.w	#$2700,sr	; disable interrupts
+	movea.l d5,a0		; make address pointer for data
+	move.l #$c0000000,d4	; CRAM address in VDP
+	lsl.w #$5,d0		; make palette number into offset
+	lsl.w #$1,d1		; make index into offset
+	add.w d1,d0		; combine offsets
+	clr.l d1		; prepare long word
+	move.w d0,d1		; just to be sure the high word is cleared
+	lsl.l #8,d1		; VDP addresses are mostly in the high word (CCAAAAAA AAAAAAAA 00000000 CCCC00AA)
+	lsl.l #8,d1		; the lowest two address bits in the dword are the most significant A15,A14
+	add.l d1,d4		; add offset
+	move.l d4,$c00004	; set VDP address into CRAM
+@1:
+	move.w (a0)+,d7		; palette entry is 0000BBB0 GGG0RRR0
+	and.w #$00f0,d7
+	move.w d7,d3
+	lsl.w #4,d3
+	or.w d3,d7		; copy to blue
+	lsr.w #4,d7		; shift to red
+	or.w d3,d7		; load blue again
+	move.w d7,$c00000	; store in VDP data address (auto increments, hopefully)
+	dbf d2,@1		; loop around as necessary
+	move.w #$2000,sr	; restore interrupts
+End Sub</PRE>With 
+that coded, I changed the palettes calls to instead call "GreyPalette" like 
+so:<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0">	GreyPalette lblptr&amp;(tf2palDat),1,0,16
+	GreyPalette lblptr&amp;(tf3palDat),2,0,16
+	GreyPalette lblptr&amp;(tf4palDat),3,0,16</PRE>(I 
+admit I was forgetting if there was another way to safely clear just the high 
+word of a 32-bit register, but this works.)<BR><BR>Finally, since I didn't like 
+the offsets, I centered all the images by changing the 'x' coordinates in the 
+"DrawTiles16" calls:<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0">	DrawTiles16 lblptr&amp;(tf2mapDat),4,0,32,9,&amp;h2080	' palette 1, char 128
+	DrawTiles16 lblptr&amp;(tf3mapDat),4,9,32,9,&amp;h41a0	' palette 2, char 416
+	DrawTiles16 lblptr&amp;(tf4mapDat),4,18,32,9,&amp;h62c0	' palette 3, char 704</PRE><A 
+title="p6.jpg - Size: 101.81KB, Downloads: 1" class="resized_img" id="ipb-attach-url-369688-0-51475100-1419913221" 
+href="http://www.atariage.com/forums/uploads//monthly_12_2014/blogentry-12959-0-36902800-1418645087.jpg" 
+rel="lightbox[11551]"><IMG width="500" height="411" class="attach" id="ipb-attach-img-369688-0-51475100-1419913221" 
+alt="Attached Image" src="02%20-%20TF%20MultiMenu%20and%20Genesis%20Cartridge%20Port%20-%20AtariAge%20Forums_files/blogentry-12959-0-36902800-1418645087_thumb.jpg"></A> 
+<BR><BR>Success! Now joypad input, and highlighting the images. This code is 
+mostly done -- to make an image colored, just call 'palettes' and load its 
+palette into the right place. To make it grey, call GreyPalette instead. Because 
+it was easier to hard code the values, and I needed it in several places, I 
+created a variable 'opt' to track which was selected, and created two 
+subroutines, greyit and lightit. Each simply does the appropriate thing based on 
+the value of 'opt'.<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0">' warning: select case without a case else will crash on invalid numbers	
+greyit:
+	valt
+	select case opt
+		case 0
+			GreyPalette lblptr&amp;(tf2palDat),1,0,16
+			exit select
+		case 1
+			GreyPalette lblptr&amp;(tf3palDat),2,0,16
+			exit select
+		case 2
+			GreyPalette lblptr&amp;(tf4palDat),3,0,16
+			exit select
+	end select
+	return
+	
+lightit:
+	valt
+	select case opt
+		case 0
+			palettes tf2palDat,1,0,16
+			exit select
+		case 1
+			palettes tf3palDat,2,0,16
+			exit select
+		case 2
+			palettes tf4palDat,3,0,16
+			exit select
+	end select
+	return</PRE>Now 
+I needed three variables - one for the option, one for the joystick, and one for 
+the last joystick value (used to prevent automatic and very fast repeating). I 
+prefer explicit, so at the top of the program:<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0">	dim joy as integer
+	dim old as integer
+	dim opt as integer</PRE>Then, 
+after the DrawTiles16 calls, we can init and run our main loop:<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0">	old = 0
+	opt = 0
+	gosub lightit
+	
+	while (1)
+		joy=joypad(0)
+		old = joy XOR old	' mask new bits
+		old = joy and old	' gives us just new presses
+		
+		if old AND &amp;h001 then
+			' up
+			if opt &gt; 0 then 
+				gosub greyit
+				opt=opt-1
+				gosub lightit
+			endif
+		endif
+		if old AND &amp;h002 then
+			' down
+			if opt &lt; 2 then
+				gosub greyit
+				opt=opt+1
+				gosub lightit
+			endif
+		endif
+		if old AND &amp;h080 then
+			' start
+
+		endif
+		
+		old=joy
+	wend</PRE>The 
+first 'gosub lightit' makes sure the default option is lit before we start, 
+since we don't update the screen unless we move. The three lines around the 
+joypad are a clever trick I saw in Thunder Force 3 -- the end result of those 
+three instructions is that 'joy' has the current set of inputs, and 'old' has 
+ONLY the /new/ inputs. Very handy for a menu like this, and easier than simply 
+waiting for the user to release the button (like I used to). Note the "old=joy" 
+at the bottom of the loop - without that it doesn't work! <IMG class="bbc_emoticon" 
+alt=";)" src="02%20-%20TF%20MultiMenu%20and%20Genesis%20Cartridge%20Port%20-%20AtariAge%20Forums_files/icon_wink.gif"><BR><BR>The 
+"if old AND &amp;h001 then" checks whether 'up' in set in 'old' -- the bit 
+values come from the BEX documentation. If up WAS just pressed, and opt is 
+greater than 0 (can't go up at the top), then we first gosub 'greyit' which will 
+grey the current selection, then subtract 1 from opt, then call 'lightit' so the 
+new selection is lit. We do essentially the same thing in the opposite direction 
+for down.<BR><BR>Finally, there's a selection for 'start', but we aren't that 
+far yet.<BR><BR><A title="p7.jpg - Size: 111.9KB, Downloads: 1" class="resized_img" 
+id="ipb-attach-url-369690-0-51497900-1419913221" href="http://www.atariage.com/forums/uploads//monthly_12_2014/blogentry-12959-0-67763900-1418645653.jpg" 
+rel="lightbox[11551]"><IMG width="500" height="411" class="attach" id="ipb-attach-img-369690-0-51497900-1419913221" 
+alt="Attached Image" src="02%20-%20TF%20MultiMenu%20and%20Genesis%20Cartridge%20Port%20-%20AtariAge%20Forums_files/blogentry-12959-0-67763900-1418645653_thumb.jpg"></A> 
+<A title="p8.jpg - Size: 116.08KB, Downloads: 1" class="resized_img" id="ipb-attach-url-369691-0-51520200-1419913221" 
+href="http://www.atariage.com/forums/uploads//monthly_12_2014/blogentry-12959-0-50557100-1418645654.jpg" 
+rel="lightbox[11551]"><IMG width="500" height="411" class="attach" id="ipb-attach-img-369691-0-51520200-1419913221" 
+alt="Attached Image" src="02%20-%20TF%20MultiMenu%20and%20Genesis%20Cartridge%20Port%20-%20AtariAge%20Forums_files/blogentry-12959-0-50557100-1418645654_thumb.jpg"></A> 
+<A title="p9.jpg - Size: 112.43KB, Downloads: 1" class="resized_img" id="ipb-attach-url-369692-0-51542400-1419913221" 
+href="http://www.atariage.com/forums/uploads//monthly_12_2014/blogentry-12959-0-37352500-1418645655.jpg" 
+rel="lightbox[11551]"><IMG width="500" height="411" class="attach" id="ipb-attach-img-369692-0-51542400-1419913221" 
+alt="Attached Image" src="02%20-%20TF%20MultiMenu%20and%20Genesis%20Cartridge%20Port%20-%20AtariAge%20Forums_files/blogentry-12959-0-37352500-1418645655_thumb.jpg"></A> 
+<BR><BR>And it works! So far! Next entry delves into bank switching, because I 
+should have been in bed four hours ago.... ;)</div>
+</BODY></HTML>

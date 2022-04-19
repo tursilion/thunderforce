@@ -1,0 +1,59 @@
+<!DOCTYPE HTML>
+<H1 class="ipsType_pagetitle">Extra Lives for Testing Thunder Force 2</H1>
+<DIV class="desc">														Posted by <STRONG><A title="View Profile" class="_hovertrigger url fn name " 
+href="http://atariage.com/forums/user/12959-tursi/" data-ipb="noparse" 
+hovercard-id="12959" hovercard-ref="member"><SPAN 
+itemprop="name">Tursi</SPAN></A></STRONG>, 																													29 
+December 2014							 · 							33 views						 </DIV><BR class="clear"></DIV>
+<DIV class="entry_content ipsType_textblock ipsPad">																			Thunder 
+Force II - allow lots more lives. TF2 usually allows only 3-5 lives, and it's 
+frankly, overly hard in places. So, for testing, I thought it would be nice to 
+be able to select a lot more lives. (To get into the options menu, hold A while 
+pressing Start on the title page).<BR><BR>Back in Regen, I did a RAM dump at 
+both '5' lives and '3' lives, then loaded a diff. Only 2 values differed - at 
+9829 was the values '4' and '2', which seemed likely (a later change looked like 
+the display character.) I tried directly changing the value at 9829 to '23' 
+(just at random), then moving DOWN off the option (because sideways would just 
+wrap the value), and sure enough, it took, so this was likely it. '23' displayed 
+as '36' - which is correct for hex-&gt;decimal, plus 1.<BR><BR>Setting a 
+breakpoint on reading 9828 (since '9829' never triggered), and moving right, I 
+got this bit of code at $6F22:<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0"> btst #$3,D0		check joystick right
+ beq $6F46		jump if not set
+ addq.w #1,$ff9828.l	add '1' to life counter
+ cmpi.w #$4,$ff9828.l	test against '4'
+ bls x1			jump if less or equal
+ move.w #$2,$ff9828.l	greater than 4, reset to '2'
+x1:
+ bsr $6f74		probably a display routine
+</PRE>This 
+is clearly the code to hack for increment - it contains both the max value and 
+the reset value. I think 99 lives should be enough, so let's go ahead and change 
+the maximum to that. It's only the max we need to change here. 99 in hexadecimal 
+is $63, and subtract 1 for the counter, so $62.<BR><BR>At $6F30, replace "0004" 
+with "0062".<BR><BR>We'll also reset the minimum lives to '1' so you can have a 
+single life game - why not?<BR><BR>At $6f3A, replace "0002" with 
+"0000".<BR><BR>The BEQ tells where to look for the other direction (probably), 
+and looking at $6f46, sure enough, is the similar code:<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0"> btst #$2,d0		check joystick left
+ beq $6f68		jump if not set
+ subq.w #$1,$FF9828.l	subtract '1' from life counter
+ cmpi.w #$1,$ff9828.l	test against '1'
+ bne x2			jump if not equal
+ move.w #$4,$ff9828.l	reset to '4'
+x2:
+ bsr $6f74		same probable display routine
+</PRE>Great! 
+So we need to change the wrap around value, changing the '4' to $62.<BR><BR>At 
+$6f5E, replace "0004" with "0062"<BR><BR>Then, to change the wrap point, replace 
+the '1' with '$FFFF' (because it will have wrapped around).<BR><BR>At $6F54, 
+replace "0001" with "FFFF".<BR><BR>Now, of course, we need to recalculate the 
+checksum. Break on read of $18E, and load the newly modified ROM. D0 should 
+contain the new checksum (if Regen let the loop finish before breaking). In this 
+case I see "C986".<BR><BR>At $18E, replace "C8CA" with "C986"<BR><BR>That should 
+now let you select 1-99 lives in the menu.<BR><BR><A title="TF299lives.jpg - Size: 83.48KB, Downloads: 0" 
+class="resized_img" id="ipb-attach-url-371382-0-22417100-1419913311" href="http://www.atariage.com/forums/uploads//monthly_12_2014/blogentry-12959-0-60684800-1419850802.jpg" 
+rel="lightbox[11596]"><IMG width="500" height="444" class="attach" id="ipb-attach-img-371382-0-22417100-1419913311" 
+alt="Attached Image" src="11%20-%20Extra%20Lives%20for%20Testing%20Thunder%20Force%202%20-%20AtariAge%20Forums_files/blogentry-12959-0-60684800-1419850802_thumb.jpg"></A> 
+<BR><BR>(got a couple more coming, it was just getting too long for one entry, 
+even for me).</BODY></HTML>

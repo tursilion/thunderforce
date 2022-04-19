@@ -1,0 +1,229 @@
+<!DOCTYPE HTML>
+<html><body>
+<H1 class="ipsType_pagetitle">And patching up lives in Lightening Force</H1>
+<DIV class="desc">														Posted by <STRONG><A title="View Profile" class="_hovertrigger url fn name " 
+href="http://atariage.com/forums/user/12959-tursi/" data-ipb="noparse" 
+hovercard-id="12959" hovercard-ref="member"><SPAN 
+itemprop="name">Tursi</SPAN></A></STRONG>, 																													29 
+December 2014							 · 							50 views						 </DIV><BR class="clear"></DIV>
+<DIV class="entry_content ipsType_textblock ipsPad">																			After 
+doing the extra work to allow single life games in TF2 and TF3, I was a little 
+disappointed that TF4 doesn't allow it - going from 2 stock ships (3 lives) to 0 
+(99 lives). So, since I'd already found the menu code and it was above the 
+hack-protected (hopefully) area, I wondered about just changing it to work the 
+same as the other two.<BR><BR>When I last looked at TF4, I found the menu 
+settings for the music test around $FF1A, so the stock ship entry would probably 
+be around there, too. I disassembled the region to try and find a likely 
+candidate, expecting similar patterns to above. This didn't work, so I fell back 
+on the TF2 trick and dumped RAM a couple of times.<BR><BR>This identified $8C96 
+as the likely candidate, showing the same value as the screen did. The good news 
+was changing this value changed the menu correctly. The bad news was setting an 
+invalid value locked up the menu (perhaps because of the animation), meaning I 
+might need to do a little rewriting to display the numbers like the music test, 
+rather than the fancy spinning numbers.<BR><BR>Anyway, I could breakpoint on 
+writes to that address to find the menu code. Moving right stopped on $FE32, and 
+I disassembled the area to find a somewhat more complex block of code, but 
+eventually found the interesting parts starting at $FE1E:<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0"> moveq #$1,D4		a keypress is confirmed at this point - sets step to '1'
+ btst #$2,d0		test joystick left
+ beq notleft
+ moveq #$-1,d4		set step to -1 if it was left
+</PRE>It 
+then goes through some table lookups and subroutine calls that I presume have 
+something to do with the animation. Finally, we pick up again at 
+$FE78:<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0"> add.w d4,d6		add step to count
+ bpl nonegwrap		branch if it didn't go below zero
+ moveq #$4,d6		wrap to high value of 4
+ bra valueset
+
+nonegwrap:
+ cmp.w #$1,d6		check if we went to 1
+ bne notone
+ add.w d4,d6		add the step again (2-&gt;1 becomes 2-&gt;0, 0-&gt;1 becomes 0-&gt;2)
+ bra valueset
+
+notone:
+ cmp.w #$5,d6		check for high value 5
+ bne valueset		all tests done if this passed
+ moveq #$0,d6		wrap around to 0
+
+valueset:
+ move.w d6,$8c96.w	write the new value back out
+</PRE>Then 
+there is some similar code that again looks like something to do with the 
+animation.<BR><BR>So at the beginning, the hack looks pretty simple. Change the 
+high values, remove the skip over of '1' (which really means 2 lives). The 
+animation will likely break, badly, based on the earlier test, but we can do 
+that much. We'll also need to find (later) where 0 becomes 
+99.<BR><BR>Unfortunately, we can't use moveq with values as high as 99, so this 
+block needs a rewrite. Luckily we should have lots of space.<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0"> org $fe78
+ add.w d4,d6		add the step
+ bpl lowokay		if it didn't wrap low, jump ahead
+ move.w #$62,d6		if it did, wrap around to 98
+ bra valueset		value okay
+lowokay:
+ cmp.w #$62,d6		check for high value
+ bls valueset		branch if okay
+ clr.w d6		reset to zero if not
+valueset:
+ move.w d6,$8c96.w	write the value back
+ nop			padding to match original code
+</PRE>This 
+looks like this - from $FE78 to $FE95<BR>FE78: dc44 6a00 000a 3c3c 0062 6000 
+000c bc7c<BR>0062 6300 0004 4246 31c6 8c96 4e71<BR><BR>This works as anticipated 
+- '1' displays as '0' (the lookup tables matched that), and going below zero or 
+above 4 crashes the system so badly the emulator messes up. ;)
+So now we have to work out how to display the numbers like the music test does, 
+without the animation.<BR><BR>I already have the music test code at $ff1a for 
+selecting, so I took a look at how it displays the number. The music index was 
+stored in $8c98, then the code jumps to $ff76. This does a branch to $11ec8, 
+which appears to be a VDP function that waits for 2 vertical blanks, then 
+returns.<BR><BR>The rest of the function does appear to be a display 
+function:<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0"> lea $b000.w, a0	prepare VDP address
+ moveq #$f,d0		prepare mask
+ and.w $8c98.w,d0	get last digit
+ ori.w #$a000,d0	VDP attributes?
+ addi.w #$11,d0		character set offset?
+ moveq #$1c,d1		column 28?
+ moveq #$11,d2		row 17?
+ bsr $123b8		VDP character out
+ 
+ move.w $8c98.w,d0	get value again
+ and.w #$f0,d0		get second digit
+ lsr.w #4,d0		shift down
+ or.w #$a000,d0		rest same as above
+ addi.w #$11,d0
+ moveq #$1b,d0		except column 27
+ moveq #$11,d2
+ bsr $123b8
+ 
+ move.w $8c98.w,d0	but then what's this?
+ bsr $1231c		could be title lookup - part I need is done anyway
+</PRE>So 
+the code appears to be hard-coded, inline. This particular code is BCD, which is 
+not really what I want.<BR><BR>Should be possible to overwrite the animation 
+code with something similar, then.<BR><BR>I decided, too, since TF2 and TF3 are 
+showing how many LIVES you get, that I would make Lightening Force be 
+consistent, and display 1-99, rather than 0-98.<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0"> org $fe96
+ bsr $11ec8		wait 2 vblanks
+ lea $b000.w, a0	prepare VDP address
+ moveq #0,d6		prepare d6
+ move.w $8c96.w,d6	make sure it's JUST a word
+ addq #1,d6		increment it for display
+ divu #10,d6		after storing it, divide by 10 - MSW=remainder, LSW=quotient
+ moveq #0,d0
+ move.w d6,d0
+ ori.w #$a000,d0	VDP attributes?
+ addi.w #$11,d0		character set offset?
+ moveq #$1b,d1		column 27
+ moveq #$0f,d2		row 15
+ bsr $123b8		VDP character out
+ 
+ swap d6
+ move.w d6,d0
+ ori.w #$a000,d0	VDP attributes?
+ addi.w #$11,d0		character set offset?
+ moveq #$1c,d1		column 28
+ moveq #$0f,d2		row 15
+ bsr $123b8		VDP character out
+ 
+ rts			done
+</PRE>This 
+is placed right after the NOP above. The RTS is at $FED8, which this easily fits 
+in. I've included a BSR $11EC8, which as I mentioned is just a VDP delay, 
+because the code seems to like it.<BR><BR>FE96: 6100 2030 41f8 b000 7c00 3c38 
+8c96 5246<BR>8cfc 000a 7000 3006 0040 a000 0640 0011<BR>721b 740f 6100 24fc 4846 
+3006 0040 a000<BR>0640 0011 721c 740f 6100 24e8 4e75<BR><BR>That overwrites the 
+second half of the animation (where it expands), we still need to eliminate the 
+first half, too. For that, we'll just jump over it from $FE32 to $fe78<BR>
+<PRE class="prettyprint lang-auto linenums:0"> org $fe32
+ bra $fe78</PRE>FE28: 
+replace "41fa" with "6044"<BR><BR>This now works, but, it spins very quickly. We 
+need to change the input from the continuous to the edge triggered one, and we 
+still need to make 0 mean 0. (Other values seem to work). We also need to fix 
+the entry to the configuration screen, which does not display right.<BR><BR>So 
+again, back to the input code. We know a direction is being set at $FE1E, so I 
+had work a little further back to see where it was coming from.<BR><BR>At $FE0E 
+there's this block:<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0"> move.w $8c82.w,d0	get joystick value
+ or.w $8c84.w,d0	merge joystick value 2
+ and.w #$c,d0		mask to just left and right
+ beq $fed8		branch if neither set
+</PRE>I 
+know from TF3 that there is probably a 'just pressed' and a 'held' value on the 
+joystick, and those are probably both of them (for whatever reason). So I just 
+need to see which is which. By loading up the RAM viewer to watch those values, 
+however, I made an even better discovery - at $8CBE is a joystick value which is 
+a keypress with delay then repeat - it's used for the menu up/down. But it 
+should do the trick here perfectly. Besides that, $8c82 was the current value, 
+and I couldn't tell from looking what $8C84 was. Breakpointing in the joystick 
+routine would tell me, but that seems unnecessary.<BR><BR>So all I want to do is 
+change the $8C82 to $8CBE. The OR doesn't seem to cause issues, so for now we'll 
+leave it.<BR><BR>$FE10: change "8C82" to "8CBE"<BR><BR>After that lucky break, 
+the next two issues just require watching the value at certain points - we need 
+to trap the entry to the configuration screen to draw the value correctly, and 
+we need to trap the game start to no longer remap 0 to 99. So, we set a 
+breakpoint on reading $8C96 (while NOT in config). This quickly showed that 
+memory location was changed a lot... $F056 appears to contain the persistent 
+copy of the configuration.<BR><BR>Using that, the entry display code looks like 
+this at $F9E0:<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0"> move.w $f056.w,d6
+ lea $feea.l,a0
+ move.w d6,d7
+ add.w d7,d7
+ move.w (a0,d7.w),d7
+ move.w #$8000,d0
+ moveq #$1c,d1
+ moveq #$f,d2
+ movea.l (a2,d7.w),a0
+ bsr $123cc
+</PRE>Most 
+of that, I believe, are lookups into the animation tables. Since we have a 
+lovely little display routine already at $fe96, we can just BSR to that. The 
+next code reloads A0 and D0, which our function uses, and we can just load D6 in 
+case it wants it later (I doubt it, but we have room).<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0"> org $f9e0
+ move.w $f056.w,d6	load d6
+ move.w d6,$8c96.w	save it in the workspace	
+ bsr $fe9A		display ships (skipping over the vblank wait as the VDP is off)
+ move.w $f056.w,d6	reload d6 just in case
+ bra $fa02		apparent continuation code
+</PRE>F9E0: 
+3c38 f056 31c6 8c96 6100 04B0 3c38 f056<BR>6010<BR><BR>With that working, all 
+that is left is making sure that 0 does not get translated to 99 (and making 
+sure 0 works as a single-ship game). Set the lives to 00 and exit config. Then 
+set the breakpoint (on $F056, now that we know better), then begin a 
+game.<BR><BR>This triggered after the selection screen, like in TF3, right 
+around A5E. The usual disassembly and look for sense happened. And the answer 
+was actually pretty clear at $a5a:<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0"> move.w $f056.w,$f2f0.w		copy lives config to active lives count
+ bne notzero			jump if not zero
+ move.w #$63,$f2f0.w		set lives remaining to 99
+notzero:
+</PRE>All 
+we need to do, then, is defeat this test and load - the simplest thing to do is 
+replace the move immediate with a copy of the move.w above it. But there is a 
+small problem.<BR><BR>Remember the security check we found that locked up TF4 on 
+collecting a 1-up? This code is right in the middle of that 
+range.<BR><BR>Unfortunately, there seems to be no way around it if I want this 
+behaviour. I'll be able to test the game through, at least, and hopefully there 
+are no other such checksums.<BR><BR>So, first, the patch is to replace at $A62: 
+"31fc0062" - replace with "31f8f056". That repeats the copy if its zero, no harm 
+done.<BR><BR>The checksum code is at $5cae. It's safest to fix the checksum in 
+case of other tests, rather than defeat the branch, so set a breakpoint at 
+$5cc6. Then you have to play till you get a 1-up (early one in the water stage). 
+The checksum is located at $15ff8, and is a full long. In my case, replace 
+"97BEF5C5" with "87abf5c9". This of course also affects the main 
+checksum.<BR><BR>After all these changes, the main checksum at $018E should be 
+set to "1Ae6".<BR><BR><A title="tf499lives.jpg - Size: 168.68KB, Downloads: 0" 
+class="resized_img" id="ipb-attach-url-371386-0-87078600-1419913326" href="http://www.atariage.com/forums/uploads//monthly_12_2014/blogentry-12959-0-79014200-1419855385.jpg" 
+rel="lightbox[11598]"><IMG width="500" height="407" class="attach" id="ipb-attach-img-371386-0-87078600-1419913326" 
+alt="Attached Image" src="13%20-%20And%20patching%20up%20lives%20in%20Lightening%20Force%20-%20AtariAge%20Forums_files/blogentry-12959-0-79014200-1419855385_thumb.jpg"></A> 
+<BR><BR>After I've had a chance to run through each game, I'll post patches, but 
+I think I'm done for tonight ;) 
+</BODY></HTML>
+

@@ -1,0 +1,69 @@
+<!DOCTYPE HTML>
+<html><body>
+<H1 class="ipsType_pagetitle">Hack Protection in 1992</H1>
+<DIV class="desc">														Posted by <STRONG><A title="View Profile" class="_hovertrigger url fn name " 
+href="http://atariage.com/forums/user/12959-tursi/" data-ipb="noparse" 
+hovercard-id="12959" hovercard-ref="member"><SPAN 
+itemprop="name">Tursi</SPAN></A></STRONG>, 																													26 
+December 2014							 · 							63 views						 </DIV><BR class="clear"></DIV>
+<DIV class="entry_content ipsType_textblock ipsPad">																			I did 
+some further study on the Thunder Force IV lockup - I found to my pleasant 
+surprise that it reproduced on my hacked version even without the menu. So I was 
+able to dig a bit deeper.<BR><BR>I found that it came down to the branch I had 
+randomly selected on the SEGA screen - the vector table code was okay, but 
+changing those two bytes caused the hang. (After a handful of runs it finally 
+occurred to me that a save state would save me a lot of 
+time).<BR><BR>Eventually, I managed to get REGEN to breakpoint at the critical 
+moment for me --- and what did I find but a checksum routine! It was called when 
+I collected the 1-Up.<BR><BR>The code appeared to be located at $5CAE, and 
+looked like this:<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0"> lea $100.w,a1		start with address $100
+ adda.l a1,a1		double address ($200 - normal entry point)
+ moveq #$0,d0		zero accumulator
+ move.w #$2b7f,d7	count of $2b80 dwords - 44,544 bytes ($0200 - $AFFF)
+lp:
+ add.l (A1)+,d0		update checksum
+ dbra d7,lp		count down
+ eori.l #$454d4f,d0	magic value, I presume to obfuscate, XOR'd
+ cmp.l $15ff8.l,d0	test against fixed value ($97bef5c5)
+ bne $1d26		branch to failure code (does a BSR to a STOP #$2500 with no valid int configured)
+ rts			back to caller
+</PRE>I 
+was able to step through this code and get my checksum - $36beedf9 - but it made 
+me worried that there may be other tests in the code that take a long time to 
+find (for instance, maybe some endings lock up.)<BR><BR>So I wondered instead of 
+hacking the value, maybe I could instead change where the menu tests it. If that 
+is beyond $AFFF, likely other checksum code, if there is any, would leave it 
+alone.<BR><BR>I set a read breakpoint on $FFF079 in REGEN (after entering the 
+menu, since breakpoints in this emulator are buggy.) I confirmed other options 
+didn't test the byte, then selected the music line. The breakpoint again did not 
+trigger, to my disappointment. After a couple of quick tries, I found I had to 
+set $FFF078, that worked. From there I analyzed the code that triggered it. It 
+triggered at $FF20, so I dumped $FF00 - $FF24. that gave me this code, which was 
+what I was after, at $FF1A:<BR>&nbsp;<BR>
+<PRE class="prettyprint lang-auto linenums:0"> moveq #$32,D3		set upper limit
+ tst.w $f078.w		test word at $f078 for zero
+ beq l1			jump ahead if zero
+ moveq #$47,d3		not zero, so set higher limit (BCD, it appears)
+l1:
+ cmp.b #$99,d1		some unrelated check...</PRE>That 
+tells me both that a whole word was used for the game-finished flag (heh), and 
+where the code is. As it's above $AFFF, I'm going to move my hack here in hopes 
+of avoiding any other hack detection code.<BR><BR>So first, going back to a 
+pristine copy of TF4. Next, the easiest hack for the above code is to just NOP 
+out the BEQ. At $FF20, replace "6702" with "4E71". This will make the code load 
+$32, test $f078, then load $47 regardless of the result.<BR><BR>Now, of course, 
+the boot checksum will be wrong again, so we set a breakpoint for $364, load the 
+new code, and check the result. At $018E, replace "D9F6" with 
+"C165".<BR><BR>Retesting showed that this fixed the lockup, but it would be a 
+good idea to run through the whole game still and make sure nothing else breaks. 
+(I'm partly tempted to kill that checksum routine too, as it induces a slight 
+hiccup when collecting a 1-up. I always wondered about that - I thought it was 
+just loading the voice -- but messing around with code designed to protect code 
+from hacks is always a minefield - keep changes as small as possible or be 
+prepared to spend a LOT of time. ;) 
+)<BR><BR>Anyway, that appears to have TF3 and TF4 working... TF2 will be 
+trickier as it only fails under hardware. Possibly the register clears for TF3 
+will help it, since it did check one of them as well. I won't know till I get it 
+on hardware. 
+</BODY></HTML>
